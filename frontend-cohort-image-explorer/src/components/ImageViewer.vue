@@ -8,6 +8,7 @@
     let bucket_name = ref('ixi-test-bucket')
 
     let filenames_loading = ref(true)
+    let image_class = ref("image_rotate_0")
 
     async function fetchImage(file_name) {
         const url = "http://localhost:3030/api/image/" + file_name;
@@ -45,6 +46,44 @@
         }
     }
 
+    function rotate_left(input_image_class) {
+        switch(input_image_class) {
+            case "image_rotate_0":
+                image_class.value = "image_rotate_270";
+                break;
+            case "image_rotate_90":
+                image_class.value = "image_rotate_0";
+                break;
+            case "image_rotate_180":
+                image_class.value = "image_rotate_90";
+                break;
+            case "image_rotate_270":
+                image_class.value = "image_rotate_180";
+                break;
+            default:
+                image_class.value = "image_rotate_0";
+        }
+
+    }
+
+    function rotate_right(input_image_class) {
+        switch(input_image_class) {
+            case "image_rotate_0":
+                image_class.value = "image_rotate_90";
+                break;
+            case "image_rotate_90":
+                image_class.value = "image_rotate_180";
+                break;
+            case "image_rotate_180":
+                image_class.value = "image_rotate_270";
+                break;
+            case "image_rotate_270":
+                image_class.value = "image_rotate_0";
+                break;
+            default:
+                image_class.value = "image_rotate_0";
+        }
+    }
 
 </script>
 
@@ -59,8 +98,10 @@
                     <v-row>
                         <v-text-field v-model="bucket_name" label="Bucket name" style="padding: 20px;"></v-text-field>
                         <v-btn @click=fetchBucktContent(bucket_name) style="margin: 20px; margin-top: 30px;">Fetch Images</v-btn>
+                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-left-outline" @click="rotate_left(image_class)"></v-btn>
+                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-right-outline" @click="rotate_right(image_class)"></v-btn>
                     </v-row>
-                    <v-img class="mb-4" height="400" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
+                    <v-img :class="image_class" height="400" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
                     <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
                 </v-col>
                 <v-col>
@@ -88,5 +129,25 @@
         background-color: #262424;
         margin-top: 50px;
         border-radius: 5px;
+    }
+
+    .image_rotate_90 {
+        transform:rotate(90deg);
+    }
+
+    .image_rotate_180 {
+        transform:rotate(180deg);
+    }
+
+    .image_rotate_270 {
+        transform:rotate(270deg);
+    }
+
+    .image_rotate_0 {
+        transform:rotate(0deg);
+    }
+
+    .rotaion_btn {
+        margin-top: 32px;
     }
 </style>
