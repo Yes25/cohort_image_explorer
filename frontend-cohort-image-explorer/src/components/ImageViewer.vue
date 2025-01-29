@@ -1,12 +1,13 @@
 <script setup>
     import { ref } from 'vue'
 
-    let file_name = ref("")
     let image_slices = ref([])
     let curr_img_idx = ref(0)
     let num_slices = ref(0)
+    let bucket_content = ref([])
+    let bucket_name = ref('ixi-test-bucket')
 
-    let bucket_content = ref(['test1', 'test2', 'test3'])
+    let filenames_loading = ref(true)
 
     async function fetchImage(file_name) {
         const url = "http://localhost:3030/api/image/" + file_name;
@@ -26,6 +27,8 @@
     }
 
     async function fetchBucktContent(bucket_name) {
+        filenames_loading.value = true;
+
         const url = "http://localhost:3030/api/bucket/" + bucket_name;
         try {
             const response = await fetch(url);
@@ -36,6 +39,7 @@
             const json = await response.json();
             
             bucket_content.value = json.bucket_contents;
+            filenames_loading.value = false;
         } catch (error) {
             console.error(error.message);
         }
@@ -53,16 +57,36 @@
             <v-row>
                 <v-col>
                     <v-row>
-                        <v-text-field v-model="file_name" label="File name" style="padding: 20px;"></v-text-field>
-                        <v-btn @click=fetchImage(file_name) style="margin: 20px; margin-top: 30px;">Fetch Image</v-btn>
+                        <v-text-field v-model="bucket_name" label="Bucket name" style="padding: 20px;"></v-text-field>
+                        <v-btn @click=fetchBucktContent(bucket_name) style="margin: 20px; margin-top: 30px;">Fetch Images</v-btn>
                     </v-row>
                     <v-img class="mb-4" height="400" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
                     <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
                 </v-col>
-                <!-- <v-col>
-                    <v-list v-model="bucket_content"></v-list>
-                </v-col> -->
+                <v-col>
+                    <v-virtual-scroll class="image-list"
+                        :max-height="600" 
+                        :items="bucket_content"
+                    >
+                        <template v-slot:default="{ item }">
+                            <v-list-item
+                                :title="item" 
+                                :value="item" 
+                                @click="fetchImage(item)">
+                            </v-list-item>
+                        </template>   
+                    </v-virtual-scroll>
+                </v-col>
             </v-row>
         </v-responsive>
     </v-container>
 </template>
+
+
+<style scoped>
+    .image-list {
+        background-color: #262424;
+        margin-top: 50px;
+        border-radius: 5px;
+    }
+</style>
