@@ -8,7 +8,7 @@ use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod handlers;
-use handlers::fetch_image;
+use handlers::{fetch_bucket_content, fetch_image};
 
 #[tokio::main]
 async fn main() {
@@ -20,6 +20,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/api/image/{image_name}", get(fetch_image))
+        .route("/api/bucket/{bucket_name}", get(fetch_bucket_content))
         .route("/users", post(create_user));
 
     let listener = tokio::net::TcpListener::bind("localhost:3030")

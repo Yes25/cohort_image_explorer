@@ -33,11 +33,11 @@ pub async fn fetch_image(Path(image_name): Path<String>) -> impl IntoResponse {
         expiration: None,
     };
 
-    let response = Bucket::list_buckets(region.clone(), creds.clone())
-        .await
-        .unwrap();
-    let found_buckets = response.bucket_names().collect::<Vec<String>>();
-    println!("found buckets: {:#?}", found_buckets);
+    // let response = Bucket::list_buckets(region.clone(), creds.clone())
+    //     .await
+    //     .unwrap();
+    // let found_buckets = response.bucket_names().collect::<Vec<String>>();
+    // println!("found buckets: {:#?}", found_buckets);
 
     let bucket = Bucket::new(bucket_name, region.clone(), creds.clone())
         .unwrap()
@@ -81,4 +81,46 @@ pub async fn fetch_image(Path(image_name): Path<String>) -> impl IntoResponse {
 #[derive(Serialize, Debug)]
 pub struct ImageData {
     pub slices: Vec<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ObjectList {
+    pub bucket_contents: Vec<String>,
+}
+
+pub async fn fetch_bucket_content(Path(bucket_name): Path<String>) -> impl IntoResponse {
+    let region = Region::Custom {
+        region: "".to_owned(),
+        endpoint: "http://127.0.0.1:9000".to_owned(),
+    };
+
+    let creds = Credentials {
+        access_key: Some("minioadmin".to_owned()),
+        secret_key: Some("minioadmin".to_owned()),
+        security_token: None,
+        session_token: None,
+        expiration: None,
+    };
+
+    let bucket = Bucket::new(&bucket_name, region.clone(), creds.clone())
+        .unwrap()
+        .with_path_style();
+
+    let results = bucket
+        .list("".to_string(), Some("".to_string()))
+        .await
+        .unwrap();
+
+    let mut bucket_contents: Vec<String> = Vec::new();
+    for result in results {
+        for content in result.contents {
+            bucket_contents.push(content.key);
+        }
+    }
+
+    // TODO: Tale out CORS-Header for PROD
+    let mut headers = HeaderMap::new();
+    headers.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+
+    (headers, Json(ObjectList { bucket_contents }))
 }
