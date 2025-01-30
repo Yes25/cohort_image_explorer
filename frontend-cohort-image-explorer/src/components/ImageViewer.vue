@@ -1,17 +1,30 @@
 <script setup>
     import { ref } from 'vue'
+    
+    const api_url = "http://localhost:3030/api/"
 
-    let image_slices = ref([])
-    let curr_img_idx = ref(0)
-    let num_slices = ref(0)
-    let bucket_content = ref([])
-    let bucket_name = ref('ixi-test-bucket')
+    const login = ref(
+        {
+            "credentials":
+            {
+                "username":"", 
+                "password": ""
+            },
+            "acc_btn_class": "account_btn"
+        }
+        )
 
-    let filenames_loading = ref(true)
-    let image_class = ref("image_rotate_0")
+
+    const image_slices = ref([])
+    const curr_img_idx = ref(0)
+    const num_slices = ref(0)
+    const bucket_content = ref([])
+    const bucket_name = ref('ixi-test-bucket')
+
+    const image_class = ref("image_rotate_0")
 
     async function fetchImage(file_name) {
-        const url = "http://localhost:3030/api/image/" + file_name;
+        const url = api_url + "image/" + file_name;
         try {
             const response = await fetch(url);
             if (!response.ok) {
@@ -28,9 +41,7 @@
     }
 
     async function fetchBucktContent(bucket_name) {
-        filenames_loading.value = true;
-
-        const url = "http://localhost:3030/api/bucket/" + bucket_name;
+        const url =  api_url + "bucket/" + bucket_name;
         try {
             const response = await fetch(url);
             if (!response.ok) {
@@ -40,7 +51,6 @@
             const json = await response.json();
             
             bucket_content.value = json.bucket_contents;
-            filenames_loading.value = false;
         } catch (error) {
             console.error(error.message);
         }
@@ -85,14 +95,41 @@
         }
     }
 
+    async function try_login() {
+        const url =  api_url + "buckets";
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    "Authorization": "Basic " +  Base64.encode(login.credentials.username+':'+login.credentials.password),
+                }
+            })
+            if (!response.ok) {
+                throw new Error(`Response status: ${response.status}`);
+            }
+
+            const json = await response.json();
+            
+            bucket_content.value = json.bucket_contents;
+        } catch (error) {
+            console.error(error.message);
+        }
+
+        login.value.acc_btn_class = "account_btn_valid"
+
+    }
+
 </script>
 
 <template>
-    <v-container class="fill-height">
+    <v-row>
+        <v-spacer></v-spacer>
+        <LoginDialog v-model="login" @login="try_login"></LoginDialog>
+    </v-row>
+    <v-row align="center" justify="center">
+        <h1 class="text-h3 font-weight-bold">Cohort Explorer</h1>
+    </v-row>
+    <v-container class="main_container">
         <v-responsive class="align-centerfill-height mx-auto" max-width="900">
-            <div class="text-center">
-                <h1 class="text-h3 font-weight-bold">Image Viewer</h1>
-            </div>
             <v-row>
                 <v-col>
                     <v-row>
@@ -125,6 +162,10 @@
 
 
 <style scoped>
+    .main_container {
+        margin-top: 50px;
+    }
+
     .image-list {
         background-color: #262424;
         margin-top: 50px;
@@ -149,5 +190,9 @@
 
     .rotaion_btn {
         margin-top: 32px;
+    }
+
+    .account_btn {
+        margin: 32px;
     }
 </style>
