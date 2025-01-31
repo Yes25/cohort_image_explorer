@@ -5,7 +5,7 @@
     // defineEmits(['login'])
 
     const is_active = ref(true)
-    const acc_btn_class = ref("")
+    const acc_btn_class = ref("account_btn")
     
     async function try_login() {
         const url =  'http://localhost:3030/api/' + "buckets";
