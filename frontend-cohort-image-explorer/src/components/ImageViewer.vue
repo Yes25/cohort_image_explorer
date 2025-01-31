@@ -1,32 +1,37 @@
 <script setup>
+    import { rotate_left, rotate_right } from '@/js/ImageViewer'
+    import { get_auth_header } from '@/js/helper_funcs'
     import { ref } from 'vue'
     
     const api_url = "http://localhost:3030/api/"
 
-    const login = ref(
-        {
-            "credentials":
-            {
-                "username":"", 
-                "password": ""
-            },
-            "acc_btn_class": "account_btn"
-        }
-        )
-
+    const login = ref({
+        "username":"", 
+        "password": "",
+        "all_buckets": []
+    })
 
     const image_slices = ref([])
     const curr_img_idx = ref(0)
     const num_slices = ref(0)
     const bucket_content = ref([])
-    const bucket_name = ref('ixi-test-bucket')
+    
+    const bucket_name = ref('')
 
     const image_class = ref("image_rotate_0")
 
+
+    watch(
+            () => bucket_name.value,
+            (new_value) => {
+                fetchBucktContent(new_value)
+            }
+        )
+
     async function fetchImage(file_name) {
-        const url = api_url + "image/" + file_name;
+        const url = api_url + 'bucket/' + bucket_name.value + '/image/' + file_name;
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: get_auth_header(login.value.username, login.value.password) });
             if (!response.ok) {
                 throw new Error(`Response status: ${response.status}`);
             }
@@ -41,9 +46,9 @@
     }
 
     async function fetchBucktContent(bucket_name) {
-        const url =  api_url + "bucket/" + bucket_name;
+        const url =  api_url + 'bucket/' +  bucket_name;
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: get_auth_header(login.value.username, login.value.password) });
             if (!response.ok) {
                 throw new Error(`Response status: ${response.status}`);
             }
@@ -54,68 +59,6 @@
         } catch (error) {
             console.error(error.message);
         }
-    }
-
-    function rotate_left(input_image_class) {
-        switch(input_image_class) {
-            case "image_rotate_0":
-                image_class.value = "image_rotate_270";
-                break;
-            case "image_rotate_90":
-                image_class.value = "image_rotate_0";
-                break;
-            case "image_rotate_180":
-                image_class.value = "image_rotate_90";
-                break;
-            case "image_rotate_270":
-                image_class.value = "image_rotate_180";
-                break;
-            default:
-                image_class.value = "image_rotate_0";
-        }
-
-    }
-
-    function rotate_right(input_image_class) {
-        switch(input_image_class) {
-            case "image_rotate_0":
-                image_class.value = "image_rotate_90";
-                break;
-            case "image_rotate_90":
-                image_class.value = "image_rotate_180";
-                break;
-            case "image_rotate_180":
-                image_class.value = "image_rotate_270";
-                break;
-            case "image_rotate_270":
-                image_class.value = "image_rotate_0";
-                break;
-            default:
-                image_class.value = "image_rotate_0";
-        }
-    }
-
-    async function try_login() {
-        const url =  api_url + "buckets";
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    "Authorization": "Basic " +  Base64.encode(login.credentials.username+':'+login.credentials.password),
-                }
-            })
-            if (!response.ok) {
-                throw new Error(`Response status: ${response.status}`);
-            }
-
-            const json = await response.json();
-            
-            bucket_content.value = json.bucket_contents;
-        } catch (error) {
-            console.error(error.message);
-        }
-
-        login.value.acc_btn_class = "account_btn_valid"
-
     }
 
 </script>
@@ -123,7 +66,7 @@
 <template>
     <v-row>
         <v-spacer></v-spacer>
-        <LoginDialog v-model="login" @login="try_login"></LoginDialog>
+        <LoginDialog v-model="login"></LoginDialog>
     </v-row>
     <v-row align="center" justify="center">
         <h1 class="text-h3 font-weight-bold">Cohort Explorer</h1>
@@ -133,10 +76,11 @@
             <v-row>
                 <v-col>
                     <v-row>
-                        <v-text-field v-model="bucket_name" label="Bucket name" style="padding: 20px;"></v-text-field>
-                        <v-btn @click=fetchBucktContent(bucket_name) style="margin: 20px; margin-top: 30px;">Fetch Images</v-btn>
-                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-left-outline" @click="rotate_left(image_class)"></v-btn>
-                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-right-outline" @click="rotate_right(image_class)"></v-btn>
+                        <!-- <v-text-field v-model="bucket_name" label="Bucket name" style="padding: 20px;"></v-text-field> -->
+                        <v-select label="Bucket" :items="login.all_buckets" v-model="bucket_name" @input="fetchBucktContent(bucket_name)" style="margin: 20px;"></v-select>
+                        <!-- <v-btn @click=fetchBucktContent(bucket_name) style="margin: 20px; margin-top: 30px;">Fetch Images</v-btn> -->
+                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-left-outline" @click="image_class = rotate_left(image_class)"></v-btn>
+                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-right-outline" @click="image_class = rotate_right(image_class)"></v-btn>
                     </v-row>
                     <v-img :class="image_class" height="400" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
                     <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>

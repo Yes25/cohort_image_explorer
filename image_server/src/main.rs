@@ -1,9 +1,12 @@
 use axum::{routing::get, Router};
+use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod handlers;
-use handlers::{fetch_bucket_content, fetch_image};
+use handlers::{fetch_bucket_content, fetch_buckets, fetch_image};
 
 #[tokio::main]
 async fn main() {
@@ -14,9 +17,17 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
-        .route("/api/image/{image_name}", get(fetch_image))
+        .route(
+            "/api/bucket/{bucket_name}/image/{image_name}",
+            get(fetch_image),
+        )
         .route("/api/bucket/{bucket_name}", get(fetch_bucket_content))
-        .route("/api/buckets", get(fetch_bucket_content));
+        .route("/api/buckets", get(fetch_buckets))
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(CorsLayer::very_permissive()),
+        );
 
     let listener = tokio::net::TcpListener::bind("localhost:3030")
         .await
