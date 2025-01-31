@@ -18,13 +18,13 @@
     
     const bucket_name = ref('')
 
-    const image_class = ref("image_rotate_0")
+    const image_rotation = ref("image_rotate_0")
 
 
     watch(
             () => bucket_name.value,
             (new_value) => {
-                fetchBucktContent(new_value)
+                fetchBucketContent(new_value)
             }
         )
 
@@ -45,7 +45,7 @@
         }
     }
 
-    async function fetchBucktContent(bucket_name) {
+    async function fetchBucketContent(bucket_name) {
         const url =  api_url + 'bucket/' +  bucket_name;
         try {
             const response = await fetch(url, { headers: get_auth_header(login.value.username, login.value.password) });
@@ -64,79 +64,91 @@
 </script>
 
 <template>
-    <v-row>
-        <v-spacer></v-spacer>
-        <LoginDialog v-model="login"></LoginDialog>
-    </v-row>
-    <v-row align="center" justify="center">
-        <h1 class="text-h3 font-weight-bold">Cohort Explorer</h1>
-    </v-row>
-    <v-container class="main_container">
-        <v-responsive class="align-centerfill-height mx-auto" max-width="900">
-            <v-row>
-                <v-col>
-                    <v-row>
-                        <!-- <v-text-field v-model="bucket_name" label="Bucket name" style="padding: 20px;"></v-text-field> -->
-                        <v-select label="Bucket" :items="login.all_buckets" v-model="bucket_name" @input="fetchBucktContent(bucket_name)" style="margin: 20px;"></v-select>
-                        <!-- <v-btn @click=fetchBucktContent(bucket_name) style="margin: 20px; margin-top: 30px;">Fetch Images</v-btn> -->
-                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-left-outline" @click="image_class = rotate_left(image_class)"></v-btn>
-                        <v-btn class="rotaion_btn" density="compact" icon="mdi-file-rotate-right-outline" @click="image_class = rotate_right(image_class)"></v-btn>
-                    </v-row>
-                    <v-img :class="image_class" height="400" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
-                    <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
-                </v-col>
-                <v-col>
-                    <v-virtual-scroll class="image-list"
-                        :max-height="600" 
-                        :items="bucket_content"
-                    >
-                        <template v-slot:default="{ item }">
-                            <v-list-item
-                                :title="item" 
-                                :value="item" 
-                                @click="fetchImage(item)">
-                            </v-list-item>
-                        </template>   
-                    </v-virtual-scroll>
-                </v-col>
-            </v-row>
-        </v-responsive>
+    <v-container class="main_container w-100">
+        <v-row align="center" justify="center">
+            <v-spacer></v-spacer>
+            <h1 class="text-h3 font-weight-bold">Cohort Explorer</h1>
+            <v-spacer></v-spacer>
+            <LoginDialog v-model="login"></LoginDialog>
+        </v-row>
+        <v-row>
+            <!-- <v-col class="main_col meta_col">
+                <h1 class="text-h5 font-weight-bold">Meta data</h1>
+            </v-col> -->
+            <v-col class="main_col">
+                <v-row align="center" justify="center">
+                    <v-btn class="rotation_btn" density="compact" icon="mdi-file-rotate-left-outline" @click="image_rotation = rotate_left(image_rotation)"></v-btn>
+                    <v-btn class="rotation_btn" density="compact" icon="mdi-file-rotate-right-outline" @click="image_rotation = rotate_right(image_rotation)"></v-btn>
+                </v-row>
+                <v-img v-if="image_slices.length > 0" :id="image_rotation" class="image_class" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
+                    <v-sheet v-else class="image_class d-flex align-center justify-center flex-wrap text-center mx-auto px-4" :height="400" :width="400" rounded align="center" justify="center">
+                    <h1 class="text-h3 font-weight-bold">No Image</h1>
+                </v-sheet>
+                <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
+            </v-col>
+            <v-col class="main_col">
+                <v-select label="Bucket" :items="login.all_buckets" v-model="bucket_name" @input="fetchBucketContent(bucket_name)"></v-select>
+                <v-virtual-scroll class="image-list" :items="bucket_content">
+                    <template v-slot:default="{ item }">
+                        <v-list-item
+                            :title="item" 
+                            :value="item" 
+                            @click="fetchImage(item)">
+                        </v-list-item>
+                    </template>   
+                </v-virtual-scroll>
+            </v-col>
+        </v-row>
     </v-container>
 </template>
 
 
 <style scoped>
     .main_container {
-        margin-top: 50px;
+        height: 100vh;
+        width: 100vb;
+        /* background-color: blue; */
     }
 
     .image-list {
         background-color: #262424;
-        margin-top: 50px;
         border-radius: 5px;
+        max-height: 65vh;
     }
 
-    .image_rotate_90 {
+    #image_rotate_90 {
         transform:rotate(90deg);
     }
 
-    .image_rotate_180 {
+    #image_rotate_180 {
         transform:rotate(180deg);
     }
 
-    .image_rotate_270 {
+    #image_rotate_270 {
         transform:rotate(270deg);
     }
 
-    .image_rotate_0 {
+    #image_rotate_0 {
         transform:rotate(0deg);
     }
 
-    .rotaion_btn {
-        margin-top: 32px;
+    .rotation_btn {
+        margin-top: 50px;
     }
 
     .account_btn {
         margin: 32px;
     }
+
+    .image_class {
+        margin-top: 25px;
+        margin-bottom: 5px;
+        max-height: 400px;
+        padding: 2px;
+    }
+    
+    .main_cols {
+        height: 80vh;
+    }
+
 </style>
