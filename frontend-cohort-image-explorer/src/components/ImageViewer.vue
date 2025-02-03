@@ -13,13 +13,16 @@
 
     const image_slices = ref([])
     const metadata = ref(null)
-    const curr_img_idx = ref(0)
+    const curr_slice_idx = ref(0)
     const num_slices = ref(0)
-    const bucket_content = ref([])
+    const image_rotation = ref("image_rotate_0")
     
     const bucket_name = ref('')
+    
+    const bucket_content = ref([])
+    const idx_curr_shown = ref(null)
 
-    const image_rotation = ref("image_rotate_0")
+    const image_cache = ref(new Map())
 
 
     watch(
@@ -85,23 +88,25 @@
                 </v-row>
                 <!-- v-responsive needs to be here because otherwise it seems that we can't rotate the image in every aspect ratio -->
                 <v-responsive>
-                    <v-img v-if="image_slices.length > 0" :id="image_rotation" class="image_class" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
+                    <v-img v-if="image_slices.length > 0" :id="image_rotation" class="image_class" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_slice_idx]" />
                     <v-sheet v-else class="image_class d-flex align-center justify-center flex-wrap text-center mx-auto px-4" :height="400" :width="400" rounded align="center" justify="center">
                         <h1 class="text-h3 font-weight-bold">No Image</h1>
                     </v-sheet>
                 </v-responsive>
-                <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
+                <v-slider v-model="curr_slice_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
             </v-col>
             <v-col class="main_col">
                 <v-select label="Bucket" :items="login.all_buckets" v-model="bucket_name" @input="fetchBucketContent(bucket_name)"></v-select>
-                <v-virtual-scroll class="image-list" :items="bucket_content">
-                    <template v-slot:default="{ item }">
+                <!-- The :items is just here to somehow show one instance of the inner nodes <- hacky... there must be a better way -->
+                <v-virtual-scroll class="image-list" :items="[1]">
+                    <v-list v-for="(item, idx) in bucket_content">
                         <v-list-item
+                            :key="idx"
                             :title="item" 
                             :value="item" 
-                            @click="fetchImage(item)">
+                            @click="console.log(idx); idx_curr_shown=idx; fetchImage(item)">
                         </v-list-item>
-                    </template>   
+                    </v-list>
                 </v-virtual-scroll>
             </v-col>
         </v-row>
