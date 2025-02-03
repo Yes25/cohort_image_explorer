@@ -1,12 +1,14 @@
 use image::ImageEncoder;
 use std::io::Write;
 
+use std::collections::HashMap;
+
 use base64::prelude::*;
 use serde::Serialize;
 
 use nifti_decoder::Header;
 
-pub fn build_base64_image_vec(header: &Header, volume: Vec<u8>) -> Vec<String> {
+pub fn build_base64_image_vec(header: &Header, volume: Vec<u8>) -> ImageData {
     let size_x = header.dimensions[0] as u32;
     let size_y = header.dimensions[1] as u32;
     let size_z = header.dimensions[2] as u32;
@@ -29,10 +31,12 @@ pub fn build_base64_image_vec(header: &Header, volume: Vec<u8>) -> Vec<String> {
         let base64_png = BASE64_STANDARD.encode(encoded_image);
         slices.push(base64_png);
     }
-    slices
+    let metadata = HashMap::from([("dims".to_owned(), format!("[{size_x}, {size_y}, {size_z}]"))]);
+    ImageData { metadata, slices }
 }
 
 #[derive(Serialize, Debug)]
 pub struct ImageData {
+    pub metadata: HashMap<String, String>,
     pub slices: Vec<String>,
 }

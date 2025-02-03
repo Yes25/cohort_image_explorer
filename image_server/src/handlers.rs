@@ -27,9 +27,7 @@ pub async fn fetch_image(
 
     let (header, volume) = decode_nifti(image_data);
 
-    let slices = build_base64_image_vec(&header, volume);
-
-    Json(ImageData { slices })
+    Json(build_base64_image_vec(&header, volume))
 }
 
 pub async fn fetch_bucket_content(

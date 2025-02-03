@@ -12,6 +12,7 @@
     })
 
     const image_slices = ref([])
+    const metadata = ref(null)
     const curr_img_idx = ref(0)
     const num_slices = ref(0)
     const bucket_content = ref([])
@@ -40,6 +41,7 @@
             
             image_slices.value = json.slices;
             num_slices.value = json.slices.length;
+            metadata.value = json.metadata;
         } catch (error) {
             console.error(error.message);
         }
@@ -72,18 +74,22 @@
             <LoginDialog v-model="login"></LoginDialog>
         </v-row>
         <v-row>
-            <!-- <v-col class="main_col meta_col">
-                <h1 class="text-h5 font-weight-bold">Meta data</h1>
-            </v-col> -->
+            <v-col class="main_col meta_col" cols="2">
+                <h1 class="metadata_title text-h5 font-weight-bold">Meta data</h1>
+                <v-label v-if="metadata != null">Dimensions: {{metadata.dims}}</v-label>
+            </v-col>
             <v-col class="main_col">
                 <v-row align="center" justify="center">
                     <v-btn class="rotation_btn" density="compact" icon="mdi-file-rotate-left-outline" @click="image_rotation = rotate_left(image_rotation)"></v-btn>
                     <v-btn class="rotation_btn" density="compact" icon="mdi-file-rotate-right-outline" @click="image_rotation = rotate_right(image_rotation)"></v-btn>
                 </v-row>
-                <v-img v-if="image_slices.length > 0" :id="image_rotation" class="image_class" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
+                <!-- v-responsive needs to be here because otherwise it seems that we can't rotate the image in every aspect ratio -->
+                <v-responsive>
+                    <v-img v-if="image_slices.length > 0" :id="image_rotation" class="image_class" v-bind:src="'data:image/jpeg;base64,' + image_slices[curr_img_idx]" />
                     <v-sheet v-else class="image_class d-flex align-center justify-center flex-wrap text-center mx-auto px-4" :height="400" :width="400" rounded align="center" justify="center">
-                    <h1 class="text-h3 font-weight-bold">No Image</h1>
-                </v-sheet>
+                        <h1 class="text-h3 font-weight-bold">No Image</h1>
+                    </v-sheet>
+                </v-responsive>
                 <v-slider v-model="curr_img_idx" :max="num_slices-1" :step="1" style="padding: 20px;"></v-slider>
             </v-col>
             <v-col class="main_col">
@@ -149,6 +155,10 @@
     
     .main_cols {
         height: 80vh;
+    }
+
+    .metadata_title {
+        margin-top: 70px;
     }
 
 </style>
