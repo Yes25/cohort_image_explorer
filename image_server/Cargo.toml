@@ -16,4 +16,5 @@ rust-s3 = "0.35.1"
 base64 = "0.22.1"
 
 image = "0.25.5"
+dicom = { version = "0.8.1", features = ["image"] }
 nifti_decoder = { path = "../nifti_decoder" }
