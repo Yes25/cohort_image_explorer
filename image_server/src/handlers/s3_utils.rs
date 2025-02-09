@@ -6,8 +6,8 @@ use s3::region::Region;
 use s3::serde_types::ListBucketResult;
 use serde::Serialize;
 
-static S3_URL: &str = "http://127.0.0.1:9000";
-// static S3_URL: &str = "http://s3.lake-test.medicsh.de:9000";
+// static S3_URL: &str = "http://127.0.0.1:9000";
+static S3_URL: &str = "http://s3.lake-test.medicsh.de:9000";
 
 pub fn get_s3_region_and_creds(access_key: &str, secret_key: &str) -> (Region, Credentials) {
     (

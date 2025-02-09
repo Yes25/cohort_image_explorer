@@ -7,7 +7,7 @@ use tracing::info;
 use nifti_decoder::decode_nifti;
 
 mod fetch_image;
-use fetch_image::{build_base64_image_vec, ImageData};
+use fetch_image::{build_base64_image_vec, generate_dicom_image, ImageData};
 
 use s3::bucket::Bucket;
 mod s3_utils;
@@ -22,12 +22,15 @@ pub async fn fetch_image(
     let (username, password) = get_usr_and_pwd(headers);
     let bucket = get_bucket(&bucket_name, &username, &password);
 
-    let response_data = bucket.get_object(image_name).await.unwrap();
+    let response_data = bucket.get_object(&image_name).await.unwrap();
     let image_data = response_data.to_vec();
 
-    let (header, volume) = decode_nifti(image_data);
-
-    Json(build_base64_image_vec(&header, volume))
+    if (image_name).ends_with(".nii") || image_name.ends_with(".nii.gz") {
+        let (header, volume) = decode_nifti(image_data);
+        Json(build_base64_image_vec(&header, volume))
+    } else {
+        Json(generate_dicom_image(image_data))
+    }
 }
 
 pub async fn fetch_bucket_content(
