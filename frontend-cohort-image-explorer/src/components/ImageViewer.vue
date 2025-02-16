@@ -1,8 +1,7 @@
 <script setup>
 import { rotate_left, rotate_right } from "@/js/ImageViewer";
-import { get_auth_header } from "@/js/helper_funcs";
+import { get_auth_header, get_approved_images } from "@/js/helper_funcs";
 import { ref } from "vue";
-import MetadataTableRow from "./MetadataTableRow.vue";
 
 const api_url = "http://localhost:3030/api/";
 
@@ -13,17 +12,26 @@ const login = ref({
 });
 
 const image_slices = ref([]);
-const metadata = ref(null);
 const curr_slice_idx = ref(0);
 const num_slices = ref(0);
 const image_rotation = ref("image_rotate_0");
+const metadata = ref(null);
 
 const bucket_name = ref("");
-
 const bucket_content = ref([]);
-const idx_curr_shown = ref(null);
+const idx_img_curr_shown = ref(null);
 
 const image_cache = ref(new Map());
+
+const select_all = ref("false")
+watch(
+  () => select_all.value,
+  (toggle_val) => {
+    for(let item of bucket_content.value) {
+      item.isSelected = toggle_val
+    }
+  },
+);
 
 watch(
   () => bucket_name.value,
@@ -47,7 +55,6 @@ async function fetchImage(file_name) {
     image_slices.value = json.slices;
     num_slices.value = json.slices.length;
     metadata.value = json.metadata;
-    console.log(json.metadata)
   } catch (error) {
     console.error(error.message);
   }
@@ -64,8 +71,32 @@ async function fetchBucketContent(bucket_name) {
     }
 
     const json = await response.json();
+    
+    for(let item of json.bucket_contents) {
+      bucket_content.value.push({"file_name": item, "isSelected": "false"})
+    }
+  } catch (error) {
+    console.error(error.message);
+  }
+}
 
-    bucket_content.value = json.bucket_contents;
+
+
+async function approve() {
+  const url = api_url + "bucket/" + bucket_name.value + "/approve/";
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: get_auth_header(login.value.username, login.value.password),
+      body: {
+        "username": login.value.username,
+        "approved_imges": get_approved_images(bucket_content.value)
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Response status: ${response.status}`);
+    }
+
   } catch (error) {
     console.error(error.message);
   }
@@ -138,19 +169,28 @@ async function fetchBucketContent(bucket_name) {
         />
         <!-- The :items is just here to somehow show one instance of the inner nodes <- hacky... there must be a better way -->
         <v-virtual-scroll class="image-list" :items="[1]">
-          <v-list v-for="(item, idx) in bucket_content">
-            <v-list-item
+          <v-list>
+            <v-list-item v-for="(item, idx) in bucket_content"
               :key="idx"
-              :title="item"
-              :value="item"
+              :title="item.file_name"
+              :value="item.file_name"
               @click="
-                console.log(idx);
-                idx_curr_shown = idx;
-                fetchImage(item);
+                fetchImage(item.file_name);
+                idx_img_curr_shown = idx;
               "
-            />
+            >
+              <template #prepend>
+                <v-list-item-action start>
+                  <v-checkbox-btn true-value="true" false-value="false" v-model="item.isSelected"></v-checkbox-btn>
+                </v-list-item-action>
+              </template>
+            </v-list-item>
           </v-list>
         </v-virtual-scroll>
+        <v-row>
+          <v-btn class="approve_btn" @click="approve()">Approve selected</v-btn>
+          <v-checkbox class="toggle_all" label="toggle all" true-value="true" false-value="false" v-model="select_all"></v-checkbox>
+      </v-row>
       </v-col>
     </v-row>
   </v-container>
@@ -206,5 +246,14 @@ async function fetchBucketContent(bucket_name) {
 
 .metadata_title {
   margin-top: 70px;
+}
+
+.approve_btn {
+  margin-top: 20px;
+  margin-left: 12px;
+}
+
+.toggle_all {
+  margin-top: 10px;
 }
 </style>
