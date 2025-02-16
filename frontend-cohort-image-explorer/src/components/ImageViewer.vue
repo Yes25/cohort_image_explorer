@@ -83,19 +83,7 @@ async function fetchBucketContent(bucket_name) {
     <v-row>
       <v-col class="main_col meta_col" cols="3">
         <h1 class="metadata_title text-h5 font-weight-bold">Meta data</h1>
-        <template v-if="metadata != null">
-          <h1 class="text-h6 font-weight-bold">
-          Image
-          </h1>
-          <MetadataTableRow title="Dims" :val="metadata.image.dims"/>
-          <h1 class="text-h6 font-weight-bold" style="padding-top: 30px;">
-          Patient
-          </h1>
-          <MetadataTableRow title="Id:" :val="metadata.patient.id"/>
-          <MetadataTableRow title="Name:" :val="metadata.patient.name"/>
-          <MetadataTableRow title="Birthdate:" :val="metadata.patient.birth_date"/>
-          <MetadataTableRow title="Sex:" :val="metadata.patient.sex"/>
-      </template>
+        <MetadataTable v-if="metadata!=null" :metadata="metadata"/>
       </v-col>
       <v-col class="main_col">
         <v-row align="center" justify="center">
