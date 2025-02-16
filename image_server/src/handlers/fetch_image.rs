@@ -1,6 +1,5 @@
 use dicom::core::Tag;
-use dicom::dictionary_std::tags;
-use dicom::object::from_reader;
+use dicom::object::{from_reader, FileDicomObject, InMemDicomObject};
 use dicom::pixeldata::image::GenericImageView;
 use dicom::pixeldata::PixelDecoder;
 
@@ -40,18 +39,23 @@ pub fn build_base64_image_vec(header: &Header, volume: Vec<u8>) -> ImageData {
         let base64_png = BASE64_STANDARD.encode(encoded_image);
         slices.push(base64_png);
     }
-    let metadata = HashMap::from([("dims".to_owned(), format!("[{size_x}, {size_y}, {size_z}]"))]);
+    let metadata = HashMap::from([(
+        String::from("image"),
+        HashMap::from([(
+            String::from("dims"),
+            format!("[{size_x}, {size_y}, {size_z}]"),
+        )]),
+    )]);
     ImageData { metadata, slices }
 }
 
 #[derive(Serialize, Debug)]
 pub struct ImageData {
-    pub metadata: HashMap<String, String>,
+    pub metadata: HashMap<String, HashMap<String, String>>,
     pub slices: Vec<String>,
 }
 
 // Dicom image handling
-#[derive(Debug, Clone)]
 pub struct DicomImageSlice {
     pub width: u32,
     pub height: u32,
@@ -59,8 +63,43 @@ pub struct DicomImageSlice {
     location: Option<f32>,
 }
 
-fn decode_dicom_slice(dicom_file: Vec<u8>) -> DicomImageSlice {
+fn extract_dicom_header_info(
+    dicom_obj: &FileDicomObject<InMemDicomObject>,
+) -> HashMap<String, String> {
+    let patient_name = match dicom_obj.element(Tag(0x0010, 0x0010)) {
+        Ok(patient_name) => patient_name.to_str().unwrap().into_owned(),
+        Err(_e) => "".to_owned(),
+    };
+    let patient_id = match dicom_obj.element(Tag(0x0010, 0x0020)) {
+        Ok(patient_id) => patient_id.to_str().unwrap().into_owned(),
+        Err(_e) => "".to_owned(),
+    };
+    let patient_dob = match dicom_obj.element(Tag(0x0010, 0x0030)) {
+        Ok(patient_dob) => patient_dob.to_str().unwrap().into_owned(),
+        Err(_e) => "".to_owned(),
+    };
+    let patient_sex = match dicom_obj.element(Tag(0x0010, 0x0040)) {
+        Ok(patient_sex) => patient_sex.to_str().unwrap().into_owned(),
+        Err(_e) => "".to_owned(),
+    };
+    HashMap::from([
+        (String::from("name"), patient_name),
+        (String::from("id"), patient_id),
+        (String::from("birth_date"), patient_dob),
+        (String::from("sex"), patient_sex),
+    ])
+}
+
+fn decode_dicom_slice(
+    dicom_file: Vec<u8>,
+    first_slice: bool,
+) -> (DicomImageSlice, Option<HashMap<String, String>>) {
     let dicom_obj = from_reader(dicom_file.as_slice()).unwrap();
+
+    let mut header_info = None;
+    if first_slice {
+        header_info = Some(extract_dicom_header_info(&dicom_obj));
+    }
 
     let location = match dicom_obj.element(Tag(0x0020, 0x1041)) {
         Ok(location) => Some(location.to_float32().unwrap()),
@@ -75,36 +114,45 @@ fn decode_dicom_slice(dicom_file: Vec<u8>) -> DicomImageSlice {
     let luma_img = dyn_img.to_luma8();
     let img_vec = luma_img.to_vec();
 
-    DicomImageSlice {
-        width,
-        height,
-        img_vec,
-        location,
-    }
+    (
+        DicomImageSlice {
+            width,
+            height,
+            img_vec,
+            location,
+        },
+        header_info,
+    )
 }
 
-struct DicomSlices {
+struct DicomBase64Slice {
     slice: String,
     location: Option<f32>,
 }
-
-impl DicomSlices {}
 
 pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
     let mut archive = Archive::new(dicom_tar.as_slice());
 
     // TODO: Can I somehow get the number of files in the archive. Then create Vec::with_capacity() -> no alloc needed then
-    let mut slices: Vec<DicomSlices> = Vec::new();
+    let mut slices: Vec<DicomBase64Slice> = Vec::new();
 
     let mut size_x = 0;
     let mut size_y = 0;
+
+    let mut metadata = HashMap::new();
+    let mut is_first_slice = true;
 
     for slice in archive.entries().unwrap() {
         let mut slice = slice.unwrap();
 
         let mut image_buf: Vec<u8> = Vec::new();
         slice.read_to_end(&mut image_buf).unwrap();
-        let dcm_img = decode_dicom_slice(image_buf);
+        let (dcm_img, header_info) = decode_dicom_slice(image_buf, is_first_slice);
+
+        if let Some(header_info) = header_info {
+            metadata.insert(String::from("patient"), header_info);
+            is_first_slice = false;
+        }
 
         if size_x == 0 {
             size_x = dcm_img.width;
@@ -119,12 +167,11 @@ pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
             .expect("error encoding pixels as PNG");
 
         let base64_png = BASE64_STANDARD.encode(encoded_image);
-        slices.push(DicomSlices {
+        slices.push(DicomBase64Slice {
             slice: base64_png,
             location: dcm_img.location,
         });
     }
-
     slices.sort_by(|a, b| {
         if let Some(a_location) = a.location {
             if let Some(b_location) = b.location {
@@ -137,31 +184,12 @@ pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
 
     let size_z = slices.len();
     let slices = slices.drain(..).map(|dcm_slice| dcm_slice.slice).collect();
-    let metadata = HashMap::from([("dims".to_owned(), format!("[{size_x}, {size_y}, {size_z}]"))]);
+    metadata.insert(
+        String::from("image"),
+        HashMap::from([(
+            String::from("dims"),
+            format!("[{size_x}, {size_y}, {size_z}]"),
+        )]),
+    );
     ImageData { metadata, slices }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn decode_dicom_file_test() {
-        let bytes = std::fs::read(
-            "/Users/jesse/Downloads/02-09-2025-14-49-19_files_list/047MQ6EHD1JZ_HTRLYQ43T3A1.tar",
-        )
-        .unwrap();
-
-        let mut archive = Archive::new(bytes.as_slice());
-
-        for file in archive.entries().unwrap() {
-            // Make sure there wasn't an I/O error
-            let mut file = file.unwrap();
-
-            // files implement the Read trait
-            let mut image_buf: Vec<u8> = Vec::new();
-            file.read_to_end(&mut image_buf).unwrap();
-            decode_dicom_slice(image_buf);
-        }
-    }
 }

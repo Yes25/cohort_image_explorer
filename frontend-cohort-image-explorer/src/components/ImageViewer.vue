@@ -2,6 +2,7 @@
 import { rotate_left, rotate_right } from "@/js/ImageViewer";
 import { get_auth_header } from "@/js/helper_funcs";
 import { ref } from "vue";
+import MetadataTableRow from "./MetadataTableRow.vue";
 
 const api_url = "http://localhost:3030/api/";
 
@@ -46,6 +47,7 @@ async function fetchImage(file_name) {
     image_slices.value = json.slices;
     num_slices.value = json.slices.length;
     metadata.value = json.metadata;
+    console.log(json.metadata)
   } catch (error) {
     console.error(error.message);
   }
@@ -79,11 +81,21 @@ async function fetchBucketContent(bucket_name) {
       <LoginDialog v-model="login" />
     </v-row>
     <v-row>
-      <v-col class="main_col meta_col" cols="2">
+      <v-col class="main_col meta_col" cols="3">
         <h1 class="metadata_title text-h5 font-weight-bold">Meta data</h1>
-        <v-label v-if="metadata != null">
-          Dimensions: {{ metadata.dims }}
-        </v-label>
+        <template v-if="metadata != null">
+          <h1 class="text-h6 font-weight-bold">
+          Image
+          </h1>
+          <MetadataTableRow title="Dims" :val="metadata.image.dims"/>
+          <h1 class="text-h6 font-weight-bold" style="padding-top: 30px;">
+          Patient
+          </h1>
+          <MetadataTableRow title="Id:" :val="metadata.patient.id"/>
+          <MetadataTableRow title="Name:" :val="metadata.patient.name"/>
+          <MetadataTableRow title="Birthdate:" :val="metadata.patient.birth_date"/>
+          <MetadataTableRow title="Sex:" :val="metadata.patient.sex"/>
+      </template>
       </v-col>
       <v-col class="main_col">
         <v-row align="center" justify="center">
