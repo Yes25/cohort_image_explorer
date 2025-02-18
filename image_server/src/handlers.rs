@@ -4,6 +4,8 @@ use axum::response::IntoResponse;
 use axum::Json;
 use tracing::info;
 
+use serde_json::Value;
+
 use nifti_decoder::decode_nifti;
 
 mod fetch_image;
@@ -58,4 +60,32 @@ pub async fn fetch_buckets(headers: HeaderMap) -> impl IntoResponse {
     let found_buckets = response.bucket_names().collect::<Vec<String>>();
 
     Json(found_buckets)
+}
+
+pub async fn approve(
+    headers: HeaderMap,
+    Path(bucket_name): Path<String>,
+    Json(body): Json<Value>,
+) -> impl IntoResponse {
+    let (username, password) = get_usr_and_pwd(headers);
+    let bucket = get_bucket(&bucket_name, &username, &password);
+
+    let user_name = body.get("username").unwrap().as_str().unwrap();
+    info!(user_name);
+
+    let approve_tag = user_name.to_owned() + "_approved";
+
+    if let Some(approved_imges) = body.get("approved_imges") {
+        if let Some(approved_imges) = approved_imges.as_array() {
+            for file_name in approved_imges {
+                if let Some(file_name) = file_name.as_str() {
+                    let response_data = bucket
+                        .put_object_tagging(file_name, &[(&approve_tag, &"true".to_owned())])
+                        .await
+                        .unwrap();
+                    dbg!(response_data);
+                }
+            }
+        }
+    }
 }

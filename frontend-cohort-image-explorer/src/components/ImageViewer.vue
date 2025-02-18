@@ -83,15 +83,18 @@ async function fetchBucketContent(bucket_name) {
 
 
 async function approve() {
-  const url = api_url + "bucket/" + bucket_name.value + "/approve/";
+  const url = api_url + "approve/bucket/" + bucket_name.value
+  let headers = get_auth_header(login.value.username, login.value.password)
+  headers["Content-Type"] = "application/json"
+  let body = JSON.stringify({
+          "username": login.value.username,
+          "approved_imges": get_approved_images(bucket_content.value)
+        })
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: get_auth_header(login.value.username, login.value.password),
-      body: {
-        "username": login.value.username,
-        "approved_imges": get_approved_images(bucket_content.value)
-      }
+      headers: headers,
+      body: body
     });
     if (!response.ok) {
       throw new Error(`Response status: ${response.status}`);

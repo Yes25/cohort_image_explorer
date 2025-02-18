@@ -7,7 +7,7 @@ export function get_approved_images(images) {
     let approved_list = []
     for(let item of images) {
         if(item.isSelected == "true") {
-            approved_list.push(item.filename)
+            approved_list.push(item.file_name)
         }
     }
     return approved_list
