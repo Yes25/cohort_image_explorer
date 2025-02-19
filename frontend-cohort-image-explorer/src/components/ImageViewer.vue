@@ -49,7 +49,6 @@ async function fetchImage(file_name) {
     if (!response.ok) {
       throw new Error(`Response status: ${response.status}`);
     }
-
     const json = await response.json();
 
     image_slices.value = json.slices;
