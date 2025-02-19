@@ -9,7 +9,7 @@ use serde_json::Value;
 use nifti_decoder::decode_nifti;
 
 mod fetch_image;
-use fetch_image::{build_base64_image_vec, generate_dicom_image, ImageData};
+use fetch_image::{build_base64_image_vec, generate_dicom_image};
 
 use s3::bucket::Bucket;
 mod s3_utils;

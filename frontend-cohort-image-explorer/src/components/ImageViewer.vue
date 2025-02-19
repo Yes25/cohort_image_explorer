@@ -41,7 +41,7 @@ watch(
 );
 
 async function fetchImage(file_name) {
-  const url = api_url + "bucket/" + bucket_name.value + "/image/" + file_name;
+  const url = `${api_url}bucket/${bucket_name.value}/image/${file_name}`;
   try {
     const response = await fetch(url, {
       headers: get_auth_header(login.value.username, login.value.password),
@@ -53,6 +53,7 @@ async function fetchImage(file_name) {
 
     image_slices.value = json.slices;
     num_slices.value = json.slices.length;
+    curr_slice_idx.value = Math.ceil(num_slices.value / 2)
     metadata.value = json.metadata;
   } catch (error) {
     console.error(error.message);
@@ -60,7 +61,7 @@ async function fetchImage(file_name) {
 }
 
 async function fetchBucketContent(bucket_name) {
-  const url = api_url + "bucket/" + bucket_name;
+  const url = `${api_url}bucket/${bucket_name}`;
   try {
     const response = await fetch(url, {
       headers: get_auth_header(login.value.username, login.value.password),
@@ -71,6 +72,7 @@ async function fetchBucketContent(bucket_name) {
 
     const json = await response.json();
     
+    bucket_content.value = []
     for(let item of json.bucket_contents) {
       bucket_content.value.push({"file_name": item, "isSelected": "false"})
     }
@@ -80,9 +82,8 @@ async function fetchBucketContent(bucket_name) {
 }
 
 
-
 async function approve() {
-  const url = api_url + "approve/bucket/" + bucket_name.value
+  const url = `${api_url}approve/bucket/${bucket_name.value}`
   let headers = get_auth_header(login.value.username, login.value.password)
   headers["Content-Type"] = "application/json"
   let body = JSON.stringify({

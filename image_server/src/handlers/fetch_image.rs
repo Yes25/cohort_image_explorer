@@ -1,4 +1,8 @@
 use dicom::core::Tag;
+use dicom::dictionary_std::tags::{
+    BODY_PART_EXAMINED, MODALITY, PATIENT_BIRTH_DATE, PATIENT_ID, PATIENT_NAME, PATIENT_SEX,
+    SERIES_DESCRIPTION, STUDY_DATE, STUDY_DESCRIPTION,
+};
 use dicom::object::{from_reader, FileDicomObject, InMemDicomObject};
 use dicom::pixeldata::image::GenericImageView;
 use dicom::pixeldata::PixelDecoder;
@@ -63,30 +67,39 @@ pub struct DicomImageSlice {
     location: Option<f32>,
 }
 
+fn get_dicom_tag(tag: Tag, dicom_obj: &FileDicomObject<InMemDicomObject>) -> String {
+    match dicom_obj.element(tag) {
+        Ok(date_of_procedure) => match date_of_procedure.to_str() {
+            Ok(date_of_procedure) => date_of_procedure.into_owned(),
+            Err(_) => "".to_owned(),
+        },
+        Err(_) => "".to_owned(),
+    }
+}
+
 fn extract_dicom_header_info(
     dicom_obj: &FileDicomObject<InMemDicomObject>,
 ) -> HashMap<String, String> {
-    let patient_name = match dicom_obj.element(Tag(0x0010, 0x0010)) {
-        Ok(patient_name) => patient_name.to_str().unwrap().into_owned(),
-        Err(_e) => "".to_owned(),
-    };
-    let patient_id = match dicom_obj.element(Tag(0x0010, 0x0020)) {
-        Ok(patient_id) => patient_id.to_str().unwrap().into_owned(),
-        Err(_e) => "".to_owned(),
-    };
-    let patient_dob = match dicom_obj.element(Tag(0x0010, 0x0030)) {
-        Ok(patient_dob) => patient_dob.to_str().unwrap().into_owned(),
-        Err(_e) => "".to_owned(),
-    };
-    let patient_sex = match dicom_obj.element(Tag(0x0010, 0x0040)) {
-        Ok(patient_sex) => patient_sex.to_str().unwrap().into_owned(),
-        Err(_e) => "".to_owned(),
-    };
+    let patient_name = get_dicom_tag(PATIENT_NAME, dicom_obj);
+    let patient_id = get_dicom_tag(PATIENT_ID, dicom_obj);
+    let patient_dob = get_dicom_tag(PATIENT_BIRTH_DATE, dicom_obj);
+    let patient_sex = get_dicom_tag(PATIENT_SEX, dicom_obj);
+    let study_date = get_dicom_tag(STUDY_DATE, dicom_obj);
+    let study_description = get_dicom_tag(STUDY_DESCRIPTION, dicom_obj);
+    let series_description = get_dicom_tag(SERIES_DESCRIPTION, dicom_obj);
+    let modality = get_dicom_tag(MODALITY, dicom_obj);
+    let body_part_examined = get_dicom_tag(BODY_PART_EXAMINED, dicom_obj);
+
     HashMap::from([
-        (String::from("name"), patient_name),
-        (String::from("id"), patient_id),
+        (String::from("patient_name"), patient_name),
+        (String::from("patient_id"), patient_id),
         (String::from("birth_date"), patient_dob),
         (String::from("sex"), patient_sex),
+        (String::from("study_date"), study_date),
+        (String::from("study_description"), study_description),
+        (String::from("series_description"), series_description),
+        (String::from("modality"), modality),
+        (String::from("body_part_examined"), body_part_examined),
     ])
 }
 
@@ -150,7 +163,7 @@ pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
         let (dcm_img, header_info) = decode_dicom_slice(image_buf, is_first_slice);
 
         if let Some(header_info) = header_info {
-            metadata.insert(String::from("patient"), header_info);
+            metadata.insert(String::from("dicom_info"), header_info);
             is_first_slice = false;
         }
 
