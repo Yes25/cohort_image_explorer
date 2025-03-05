@@ -10,6 +10,7 @@ use dicom::pixeldata::PixelDecoder;
 use tar::Archive;
 
 use image::ImageEncoder;
+// use image::imageops::FilterType;
 use std::io::{Read, Write};
 
 use std::cmp::Ordering;
@@ -123,6 +124,12 @@ fn decode_dicom_slice(
     let dyn_img = decoded_pixel_data.to_dynamic_image(0).unwrap();
 
     let (width, height) = dyn_img.dimensions();
+    // downscale if too big
+    // if width > 256 || height > 256 {
+    //     dyn_img = dyn_img.resize(256, 256, FilterType::Triangle);
+    // }
+    // let (width, height) = dyn_img.dimensions();
+
 
     let luma_img = dyn_img.to_luma8();
     let img_vec = luma_img.to_vec();

@@ -3,7 +3,7 @@ use axum::{
     Router,
 };
 use tower::ServiceBuilder;
-use tower_http::compression::CompressionLayer;
+// use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Level;
@@ -30,8 +30,8 @@ async fn main() {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::very_permissive())
-                .layer(CompressionLayer::new()),
+                .layer(CorsLayer::very_permissive()),
+                // .layer(CompressionLayer::new()),
         );
 
     let listener = tokio::net::TcpListener::bind("localhost:3030")
