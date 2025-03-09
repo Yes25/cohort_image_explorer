@@ -20,6 +20,7 @@ const metadata = ref(null);
 const bucket_name = ref("");
 const bucket_content = ref([]);
 const idx_img_curr_shown = ref(null);
+const curr_active_items = ref(null);
 
 const image_cache = ref(new Map());
 
@@ -73,9 +74,12 @@ async function fetchBucketContent(bucket_name) {
     const json = await response.json();
     
     bucket_content.value = []
+    curr_active_items.value = []
     for(let item of json.bucket_contents) {
       bucket_content.value.push({"file_name": item, "isSelected": "false"})
+      curr_active_items.value.push(false)
     }
+
   } catch (error) {
     console.error(error.message);
   }
@@ -103,6 +107,41 @@ async function approve() {
   } catch (error) {
     console.error(error.message);
   }
+}
+
+function arrow_down() {
+  if (idx_img_curr_shown.value != null 
+      && idx_img_curr_shown.value < bucket_content.value.length-1) {
+        curr_active_items.value[idx_img_curr_shown.value] = false
+        idx_img_curr_shown.value += 1
+        curr_active_items.value[idx_img_curr_shown.value] = true
+        fetchImage(bucket_content.value[idx_img_curr_shown.value].file_name)
+      }   
+}
+
+function arrow_up() {
+  if (idx_img_curr_shown.value != null 
+      && idx_img_curr_shown.value > 0) {
+        curr_active_items.value[idx_img_curr_shown.value] = false
+        idx_img_curr_shown.value -= 1
+        curr_active_items.value[idx_img_curr_shown.value] = true
+        fetchImage(bucket_content.value[idx_img_curr_shown.value].file_name)
+      }   
+}
+function select_curr() {
+  console.log("enter func")
+  if (idx_img_curr_shown.value != null 
+      && idx_img_curr_shown.value > 0
+      ) {
+        console.log("enter if")
+        const curr_val = bucket_content.value[idx_img_curr_shown.value].isSelected
+        console.log(curr_val)
+        if(curr_val == "false") {
+          bucket_content.value[idx_img_curr_shown.value].isSelected = "true"
+        } else {
+          bucket_content.value[idx_img_curr_shown.value].isSelected = "false"
+        }
+      }
 }
 </script>
 
@@ -172,11 +211,16 @@ async function approve() {
         />
         <!-- The :items is just here to somehow show one instance of the inner nodes <- hacky... there must be a better way -->
         <v-virtual-scroll class="image-list" :items="[1]">
-          <v-list>
+          <v-list 
+            @keydown.down.prevent.stop="arrow_down()"
+            @keydown.up.prevent.stop="arrow_up()"
+            @keydown.space.prevent.stop="select_curr()"
+          >
             <v-list-item v-for="(item, idx) in bucket_content"
               :key="idx"
               :title="item.file_name"
               :value="item.file_name"
+              :active="curr_active_items[idx]"
               @click="
                 fetchImage(item.file_name);
                 idx_img_curr_shown = idx;
@@ -184,7 +228,13 @@ async function approve() {
             >
               <template #prepend>
                 <v-list-item-action start>
-                  <v-checkbox-btn true-value="true" false-value="false" v-model="item.isSelected"></v-checkbox-btn>
+                  <v-checkbox-btn
+                    :key="idx" 
+                    true-value="true" 
+                    false-value="false" 
+                    v-model="item.isSelected"
+                  >
+                  </v-checkbox-btn>
                 </v-list-item-action>
               </template>
             </v-list-item>

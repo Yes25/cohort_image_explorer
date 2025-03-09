@@ -28,7 +28,7 @@
 <template>
     <v-btn :class="acc_btn_class" icon="mdi-account" @click="is_active = !is_active"></v-btn>
 
-    <v-dialog max-width="600" v-model="is_active">
+    <v-dialog max-width="600" v-model="is_active" @keydown.enter="try_login()">
         <v-card title="Login">
             <v-card-text>
                 Plaese enter your s3 credentials.
