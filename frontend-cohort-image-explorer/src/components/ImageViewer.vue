@@ -11,6 +11,8 @@ const login = ref({
   all_buckets: [],
 });
 
+const list_item_refs = useTemplateRef('list_items')
+
 const image_slices = ref([]);
 const curr_slice_idx = ref(0);
 const num_slices = ref(0);
@@ -110,8 +112,11 @@ async function approve() {
 }
 
 function arrow_down() {
+
+  console.log(list_item_refs.value)
+
   if (idx_img_curr_shown.value != null 
-      && idx_img_curr_shown.value < bucket_content.value.length-1) {
+      && idx_img_curr_shown.value < bucket_content.value.length-1) { 
         curr_active_items.value[idx_img_curr_shown.value] = false
         idx_img_curr_shown.value += 1
         curr_active_items.value[idx_img_curr_shown.value] = true
@@ -120,6 +125,7 @@ function arrow_down() {
 }
 
 function arrow_up() {
+  
   if (idx_img_curr_shown.value != null 
       && idx_img_curr_shown.value > 0) {
         curr_active_items.value[idx_img_curr_shown.value] = false
@@ -128,19 +134,24 @@ function arrow_up() {
         fetchImage(bucket_content.value[idx_img_curr_shown.value].file_name)
       }   
 }
+
 function select_curr() {
+  
   console.log("enter func")
+  
   if (idx_img_curr_shown.value != null 
-      && idx_img_curr_shown.value > 0
-      ) {
+      && idx_img_curr_shown.value >= 0) {
+        
         console.log("enter if")
+        console.log("idx_img_curr_shown.value:::" + idx_img_curr_shown.value)
+        console.log("isSeleceted:::" + bucket_content.value[idx_img_curr_shown.value].isSelected)
         const curr_val = bucket_content.value[idx_img_curr_shown.value].isSelected
-        console.log(curr_val)
         if(curr_val == "false") {
           bucket_content.value[idx_img_curr_shown.value].isSelected = "true"
         } else {
           bucket_content.value[idx_img_curr_shown.value].isSelected = "false"
         }
+      
       }
 }
 </script>
@@ -209,18 +220,17 @@ function select_curr() {
           v-model="bucket_name"
           @input="fetchBucketContent(bucket_name)"
         />
-        <!-- The :items is just here to somehow show one instance of the inner nodes <- hacky... there must be a better way -->
-        <v-virtual-scroll class="image-list" :items="[1]">
-          <v-list 
-            @keydown.down.prevent.stop="arrow_down()"
-            @keydown.up.prevent.stop="arrow_up()"
-            @keydown.space.prevent.stop="select_curr()"
+          <v-list class="image-list"
+            @keydown.space.prevent.stop="select_curr"
+            @keydown.down.prevent.stop="arrow_down"
+            @keydown.up.prevent.stop="arrow_up"      
           >
             <v-list-item v-for="(item, idx) in bucket_content"
               :key="idx"
               :title="item.file_name"
               :value="item.file_name"
               :active="curr_active_items[idx]"
+              :ref="list_item_refs"
               @click="
                 fetchImage(item.file_name);
                 idx_img_curr_shown = idx;
@@ -229,7 +239,7 @@ function select_curr() {
               <template #prepend>
                 <v-list-item-action start>
                   <v-checkbox-btn
-                    :key="idx" 
+                    :key="idx"
                     true-value="true" 
                     false-value="false" 
                     v-model="item.isSelected"
@@ -239,7 +249,7 @@ function select_curr() {
               </template>
             </v-list-item>
           </v-list>
-        </v-virtual-scroll>
+        <!-- </v-virtual-scroll> -->
         <v-row>
           <v-btn class="approve_btn" @click="approve()">Approve selected</v-btn>
           <v-checkbox class="toggle_all" label="toggle all" true-value="true" false-value="false" v-model="select_all"></v-checkbox>
