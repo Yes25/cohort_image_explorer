@@ -1,7 +1,7 @@
 <script setup>
 import { rotate_left, rotate_right } from "@/js/ImageViewer";
 import { get_auth_header, get_approved_images } from "@/js/helper_funcs";
-import { ref } from "vue";
+import { ref, useTemplateRef } from "vue";
 
 const api_url = "http://localhost:3030/api/";
 
@@ -11,7 +11,7 @@ const login = ref({
   all_buckets: [],
 });
 
-const list_item_refs = useTemplateRef('list_items')
+const itemRefs = useTemplateRef('items')
 
 const image_slices = ref([]);
 const curr_slice_idx = ref(0);
@@ -112,9 +112,6 @@ async function approve() {
 }
 
 function arrow_down() {
-
-  console.log(list_item_refs.value)
-
   if (idx_img_curr_shown.value != null 
       && idx_img_curr_shown.value < bucket_content.value.length-1) { 
         curr_active_items.value[idx_img_curr_shown.value] = false
@@ -125,7 +122,6 @@ function arrow_down() {
 }
 
 function arrow_up() {
-  
   if (idx_img_curr_shown.value != null 
       && idx_img_curr_shown.value > 0) {
         curr_active_items.value[idx_img_curr_shown.value] = false
@@ -136,22 +132,14 @@ function arrow_up() {
 }
 
 function select_curr() {
-  
-  console.log("enter func")
-  
   if (idx_img_curr_shown.value != null 
       && idx_img_curr_shown.value >= 0) {
-        
-        console.log("enter if")
-        console.log("idx_img_curr_shown.value:::" + idx_img_curr_shown.value)
-        console.log("isSeleceted:::" + bucket_content.value[idx_img_curr_shown.value].isSelected)
         const curr_val = bucket_content.value[idx_img_curr_shown.value].isSelected
         if(curr_val == "false") {
           bucket_content.value[idx_img_curr_shown.value].isSelected = "true"
         } else {
           bucket_content.value[idx_img_curr_shown.value].isSelected = "false"
         }
-      
       }
 }
 </script>
@@ -225,12 +213,11 @@ function select_curr() {
             @keydown.down.prevent.stop="arrow_down"
             @keydown.up.prevent.stop="arrow_up"      
           >
-            <v-list-item v-for="(item, idx) in bucket_content"
+            <v-list-item v-for="(item, idx) in bucket_content" ref="items"
               :key="idx"
               :title="item.file_name"
               :value="item.file_name"
               :active="curr_active_items[idx]"
-              :ref="list_item_refs"
               @click="
                 fetchImage(item.file_name);
                 idx_img_curr_shown = idx;
