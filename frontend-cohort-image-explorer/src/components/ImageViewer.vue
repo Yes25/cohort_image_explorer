@@ -3,6 +3,9 @@ import { rotate_left, rotate_right } from "@/js/ImageViewer";
 import { get_auth_header, get_approved_images } from "@/js/helper_funcs";
 import { ref, useTemplateRef } from "vue";
 
+const NUM_CACHE_BEFORE = 3
+const NUM_CACHE_AFTER = 6
+
 const api_url = "http://localhost:3030/api/";
 
 const login = ref({
@@ -24,7 +27,7 @@ const bucket_content = ref([]);
 const idx_img_curr_shown = ref(null);
 const curr_active_items = ref(null);
 
-const image_cache = ref(new Map());
+const image_cache = new Map();
 
 const select_all = ref("false")
 watch(
@@ -53,14 +56,25 @@ async function fetchImage(file_name) {
       throw new Error(`Response status: ${response.status}`);
     }
     const json = await response.json();
-
-    image_slices.value = json.slices;
-    num_slices.value = json.slices.length;
-    curr_slice_idx.value = Math.ceil(num_slices.value / 2)
-    metadata.value = json.metadata;
+    return json
   } catch (error) {
     console.error(error.message);
   }
+}
+
+async function selectImage(file_name) {
+  let json = null
+  if(image_cache.has(file_name)) {
+    json = image_cache.get(file_name)
+  } else {
+    json = await fetchImage(file_name)
+  }
+
+  image_slices.value = json.slices;
+  num_slices.value = json.slices.length;
+  curr_slice_idx.value = Math.ceil(num_slices.value / 2)
+  metadata.value = json.metadata;
+  update_cache()
 }
 
 async function fetchBucketContent(bucket_name) {
@@ -87,6 +101,43 @@ async function fetchBucketContent(bucket_name) {
   }
 }
 
+async function update_cache() {
+  const images_to_cache = search_images_to_cache(bucket_content.value, idx_img_curr_shown.value)
+  clean_cache(images_to_cache)
+
+  for(const file_name of images_to_cache) {
+    if( ! image_cache.has(file_name) ) {
+        const image = await fetchImage(file_name)
+        image_cache.set(file_name, image)
+    }
+  }
+}
+
+function clean_cache(images_to_cache) {
+  for(const key of image_cache.keys()) {
+    if(! images_to_cache.includes(key)) {
+      image_cache.delete(key);
+    }
+  }
+
+}
+
+function search_images_to_cache(bucket_content, curr_img_index) {  
+  let images_to_cache = []
+  for(let i=0; i<NUM_CACHE_AFTER; i++) {
+    const img_idx = curr_img_index + 1 + i
+    if(img_idx < bucket_content.length) {
+      images_to_cache.push(bucket_content[img_idx].file_name)
+    }
+  }
+  for(let i=0; i<NUM_CACHE_BEFORE; i++) {
+    const img_idx = curr_img_index - 1 - i
+    if(img_idx >= 0) {
+      images_to_cache.push(bucket_content[img_idx].file_name)
+    }
+  }
+  return images_to_cache
+}
 
 async function approve() {
   const url = `${api_url}approve/bucket/${bucket_name.value}`
@@ -117,7 +168,7 @@ function arrow_down() {
         curr_active_items.value[idx_img_curr_shown.value] = false
         idx_img_curr_shown.value += 1
         curr_active_items.value[idx_img_curr_shown.value] = true
-        fetchImage(bucket_content.value[idx_img_curr_shown.value].file_name)
+        selectImage(bucket_content.value[idx_img_curr_shown.value].file_name)
       }   
 }
 
@@ -127,7 +178,7 @@ function arrow_up() {
         curr_active_items.value[idx_img_curr_shown.value] = false
         idx_img_curr_shown.value -= 1
         curr_active_items.value[idx_img_curr_shown.value] = true
-        fetchImage(bucket_content.value[idx_img_curr_shown.value].file_name)
+        selectImage(bucket_content.value[idx_img_curr_shown.value].file_name)
       }   
 }
 
@@ -219,7 +270,7 @@ function select_curr() {
               :value="item.file_name"
               :active="curr_active_items[idx]"
               @click="
-                fetchImage(item.file_name);
+                selectImage(item.file_name);
                 idx_img_curr_shown = idx;
               "
             >
