@@ -1,6 +1,6 @@
 use axum::{
     routing::{get, post},
-    Router,
+    Router
 };
 use tower::ServiceBuilder;
 // use tower_http::compression::CompressionLayer;
@@ -8,6 +8,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+
+use tower_http::services::ServeDir;
 
 mod handlers;
 use handlers::{approve, fetch_bucket_content, fetch_buckets, fetch_image};
@@ -19,7 +21,10 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
+    let path = "/Users/jesse/Code/rust_proj/cohort_image_explorer/frontend-cohort-image-explorer/dist";
+
     let app = Router::new()
+        .fallback_service(ServeDir::new(path))
         .route(
             "/api/bucket/{bucket_name}/image/{image_name}",
             get(fetch_image),

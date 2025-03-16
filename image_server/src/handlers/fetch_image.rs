@@ -130,7 +130,6 @@ fn decode_dicom_slice(
     // }
     // let (width, height) = dyn_img.dimensions();
 
-
     let luma_img = dyn_img.to_luma8();
     let img_vec = luma_img.to_vec();
 

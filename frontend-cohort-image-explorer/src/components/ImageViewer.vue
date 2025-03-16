@@ -92,7 +92,8 @@ async function fetchBucketContent(bucket_name) {
     bucket_content.value = []
     curr_active_items.value = []
     for(let item of json.bucket_contents) {
-      bucket_content.value.push({"file_name": item, "isSelected": "false"})
+      console.log(item)
+      bucket_content.value.push({"file_name": item.key, "isSelected": "false"})
       curr_active_items.value.push(false)
     }
 

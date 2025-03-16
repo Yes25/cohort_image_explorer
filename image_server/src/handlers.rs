@@ -2,7 +2,6 @@ use axum::extract::Path;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum::Json;
-use tracing::info;
 
 use serde_json::Value;
 
@@ -47,7 +46,7 @@ pub async fn fetch_bucket_content(
         .await
         .unwrap();
 
-    let bucket_contents = build_filename_list(results);
+    let bucket_contents = build_filename_list(results, bucket, username).await;
 
     Json(ObjectList { bucket_contents })
 }
@@ -71,7 +70,6 @@ pub async fn approve(
     let bucket = get_bucket(&bucket_name, &username, &password);
 
     let user_name = body.get("username").unwrap().as_str().unwrap();
-    info!(user_name);
 
     let approve_tag = user_name.to_owned() + "_approved";
 

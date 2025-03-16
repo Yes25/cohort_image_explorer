@@ -4,6 +4,7 @@ use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::region::Region;
 use s3::serde_types::ListBucketResult;
+use s3::Tag;
 use serde::Serialize;
 
 static S3_URL: &str = "http://127.0.0.1:9000";
@@ -35,17 +36,40 @@ pub fn get_bucket(bucket_name: &str, access_key: &str, secret_key: &str) -> Box<
 
 #[derive(Serialize, Debug)]
 pub struct ObjectList {
-    pub bucket_contents: Vec<String>,
+    pub bucket_contents: Vec<BucketContent>,
 }
 
-pub fn build_filename_list(results: Vec<ListBucketResult>) -> Vec<String> {
-    let mut bucket_contents: Vec<String> = Vec::new();
+#[derive(Serialize, Debug)]
+pub struct BucketContent {
+    pub key: String,
+    pub approved: bool,
+}
+
+pub async fn build_filename_list(results: Vec<ListBucketResult>, bucket: Box<s3::Bucket>, username: String) -> Vec<BucketContent> {
+    let mut bucket_contents: Vec<BucketContent> = Vec::new();
     for result in results {
         for content in result.contents {
-            bucket_contents.push(content.key);
+            let file_name = content.key;
+            let tag_data = bucket.get_object_tagging(&file_name).await.unwrap().0;
+            let approved = get_approval(tag_data, &username);
+            bucket_contents.push(
+                BucketContent{
+                    key: file_name,
+                    approved
+                }
+            );
         }
     }
     bucket_contents
+}
+
+fn get_approval(tag_data: Vec<Tag>, username: &String) -> bool {
+    for tag in tag_data {
+        if tag.key() == format!("{}_approved",username) && tag.value() == "true" {
+            return true
+        }
+    }
+    false
 }
 
 pub fn get_usr_and_pwd(headers: HeaderMap) -> (String, String) {
