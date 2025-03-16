@@ -42,7 +42,7 @@ pub struct ObjectList {
 #[derive(Serialize, Debug)]
 pub struct BucketContent {
     pub key: String,
-    pub approved: bool,
+    pub approved: String,
 }
 
 pub async fn build_filename_list(results: Vec<ListBucketResult>, bucket: Box<s3::Bucket>, username: String) -> Vec<BucketContent> {
@@ -63,13 +63,13 @@ pub async fn build_filename_list(results: Vec<ListBucketResult>, bucket: Box<s3:
     bucket_contents
 }
 
-fn get_approval(tag_data: Vec<Tag>, username: &String) -> bool {
+fn get_approval(tag_data: Vec<Tag>, username: &String) -> String {
     for tag in tag_data {
-        if tag.key() == format!("{}_approved",username) && tag.value() == "true" {
-            return true
+        if tag.key() == format!("{username}_approved") && tag.value() == "true" {
+            return String::from("true")
         }
     }
-    false
+    String::from("false")
 }
 
 pub fn get_usr_and_pwd(headers: HeaderMap) -> (String, String) {
