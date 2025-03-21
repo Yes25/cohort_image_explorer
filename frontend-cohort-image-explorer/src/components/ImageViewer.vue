@@ -3,8 +3,8 @@ import { rotate_left, rotate_right } from "@/js/ImageViewer";
 import { get_auth_header, get_approved_images } from "@/js/helper_funcs";
 import { ref, useTemplateRef } from "vue";
 
-const NUM_CACHE_BEFORE = 3
-const NUM_CACHE_AFTER = 6
+const NUM_CACHE_BEFORE = 2
+const NUM_CACHE_AFTER = 3
 
 const api_url = "http://localhost:3030/api/";
 
@@ -27,7 +27,9 @@ const bucket_content = ref([]);
 const idx_img_curr_shown = ref(null);
 const curr_active_items = ref(null);
 
-const image_cache = new Map();
+const image_cache = ref(new Map());
+let curr_img_abort_control = null
+let images_being_fetched = new Map()
 
 const select_all = ref("false")
 watch(
@@ -46,12 +48,21 @@ watch(
   },
 );
 
-async function fetchImage(file_name) {
+watch(
+  () => bucket_name.value,
+  (new_value) => {
+    fetchBucketContent(new_value);
+  },
+);
+
+async function fetchImage(file_name, abort_controller) {
   const url = `${api_url}bucket/${bucket_name.value}/image/${file_name}`;
   try {
     const response = await fetch(url, {
       headers: get_auth_header(login.value.username, login.value.password),
+      signal: abort_controller.signal
     });
+    abort_controller = null
     if (!response.ok) {
       throw new Error(`Response status: ${response.status}`);
     }
@@ -59,21 +70,39 @@ async function fetchImage(file_name) {
     return json
   } catch (error) {
     console.error(error.message);
+    return null
   }
 }
 
 async function selectImage(file_name) {
   let json = null
+  if (curr_img_abort_control != null) {
+    curr_img_abort_control.abort()
+  }
   if(image_cache.has(file_name)) {
     json = image_cache.get(file_name)
+  } else if(images_being_fetched.has(file_name)) {
+    
+    while(true) {
+      try {
+        json = image_cache.get(file_name)
+        break
+      } catch (e) {
+        console.log('still loading')
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } 
   } else {
-    json = await fetchImage(file_name)
+    curr_img_abort_control = new AbortController()
+    json = await fetchImage(file_name, curr_img_abort_control)
   }
-
-  image_slices.value = json.slices;
-  num_slices.value = json.slices.length;
-  curr_slice_idx.value = Math.ceil(num_slices.value / 2)
-  metadata.value = json.metadata;
+  if(json != null) {
+    image_slices.value = json.slices;
+    num_slices.value = json.slices.length;
+    curr_slice_idx.value = Math.ceil(num_slices.value / 2)
+    metadata.value = json.metadata;
+    image_cache.set(file_name, json)
+  }
   update_cache()
 }
 
@@ -92,8 +121,7 @@ async function fetchBucketContent(bucket_name) {
     bucket_content.value = []
     curr_active_items.value = []
     for(let item of json.bucket_contents) {
-      console.log(item)
-      bucket_content.value.push({"file_name": item.key, "isSelected": "false"})
+      bucket_content.value.push({"file_name": item.key, "isSelected": item.approved})
       curr_active_items.value.push(false)
     }
 
@@ -104,11 +132,14 @@ async function fetchBucketContent(bucket_name) {
 
 async function update_cache() {
   const images_to_cache = search_images_to_cache(bucket_content.value, idx_img_curr_shown.value)
+  abort_fetch_not_needed(images_to_cache)
   clean_cache(images_to_cache)
 
   for(const file_name of images_to_cache) {
     if( ! image_cache.has(file_name) ) {
-        const image = await fetchImage(file_name)
+        const abort_controller = new AbortController()
+        images_being_fetched.set(file_name, abort_controller)
+        const image = await fetchImage(file_name, abort_controller)
         image_cache.set(file_name, image)
     }
   }
@@ -117,24 +148,33 @@ async function update_cache() {
 function clean_cache(images_to_cache) {
   for(const key of image_cache.keys()) {
     if(! images_to_cache.includes(key)) {
-      image_cache.delete(key);
+      image_cache.delete(key)
     }
   }
-
 }
 
+function abort_fetch_not_needed(images_to_cache) {
+  for(const key of images_being_fetched.keys()) {
+    if(! images_to_cache.includes(key)) {
+      images_being_fetched.get(key).abort()
+      images_being_fetched.delete(key)
+    }
+  }
+}
+
+
 function search_images_to_cache(bucket_content, curr_img_index) {  
-  let images_to_cache = []
+  const images_to_cache = []
   for(let i=0; i<NUM_CACHE_AFTER; i++) {
-    const img_idx = curr_img_index + 1 + i
+    const img_idx = curr_img_index + i
     if(img_idx < bucket_content.length) {
-      images_to_cache.push(bucket_content[img_idx].file_name)
+      images_to_cache.push(bucket_content[img_idx].file_name, null)
     }
   }
   for(let i=0; i<NUM_CACHE_BEFORE; i++) {
     const img_idx = curr_img_index - 1 - i
     if(img_idx >= 0) {
-      images_to_cache.push(bucket_content[img_idx].file_name)
+      images_to_cache.push(bucket_content[img_idx].file_name, null)
     }
   }
   return images_to_cache

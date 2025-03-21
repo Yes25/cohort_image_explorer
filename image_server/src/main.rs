@@ -17,7 +17,7 @@ use handlers::{approve, fetch_bucket_content, fetch_buckets, fetch_image};
 #[tokio::main]
 async fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::DEBUG)
+        .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
