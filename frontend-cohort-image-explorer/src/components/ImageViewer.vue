@@ -5,6 +5,7 @@ import { ref, useTemplateRef } from "vue";
 
 const NUM_CACHE_BEFORE = 2
 const NUM_CACHE_AFTER = 3
+const NUM_MAX_CACHED_IMG = 10
 
 const api_url = "http://localhost:3030/api/";
 
@@ -15,6 +16,8 @@ const login = ref({
 });
 
 const itemRefs = useTemplateRef('items')
+
+const loading = ref(false)
 
 const image_slices = ref([]);
 const curr_slice_idx = ref(0);
@@ -49,11 +52,27 @@ watch(
 );
 
 watch(
-  () => bucket_name.value,
-  (new_value) => {
-    fetchBucketContent(new_value);
-  },
+  () => image_cache.value,
+  (cache) => {
+    const cache_lenth = cache.size
+    if (cache_lenth >= NUM_MAX_CACHED_IMG) {
+      remove_oldest(cache)
+    }
+  },{ deep: true}
 );
+
+
+function remove_oldest(cache) {
+  let oldest_key = null
+  let oldest_timestamp = Date.now()
+  for(const [key, value] of cache) {
+    if(value.timestamp < oldest_timestamp) {
+      oldest_timestamp = value.timestamp
+      oldest_key = key
+    }
+  }
+  cache.delete(oldest_key)
+}
 
 async function fetchImage(file_name, abort_controller) {
   const url = `${api_url}bucket/${bucket_name.value}/image/${file_name}`;
@@ -76,34 +95,34 @@ async function fetchImage(file_name, abort_controller) {
 
 async function selectImage(file_name) {
   let json = null
-  if (curr_img_abort_control != null) {
+  
+  if (images_being_fetched.has(file_name)) {
+    console.log(`${file_name} already beeing fetched`)
+    return
+  } else if (curr_img_abort_control != null) {
     curr_img_abort_control.abort()
+    images_being_fetched.delete(file_name)
+    console.log(`Fetching ${file_name} aborted`)
   }
-  if(image_cache.has(file_name)) {
-    json = image_cache.get(file_name)
-  } else if(images_being_fetched.has(file_name)) {
-    
-    while(true) {
-      try {
-        json = image_cache.get(file_name)
-        break
-      } catch (e) {
-        console.log('still loading')
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    } 
+  if(image_cache.value.has(file_name)) {
+    json = image_cache.value.get(file_name).data
   } else {
     curr_img_abort_control = new AbortController()
+    images_being_fetched.set(file_name)
+    loading.value = true
     json = await fetchImage(file_name, curr_img_abort_control)
+    loading.value = false
+    curr_img_abort_control = null
+    images_being_fetched.delete(file_name)
   }
   if(json != null) {
     image_slices.value = json.slices;
     num_slices.value = json.slices.length;
     curr_slice_idx.value = Math.ceil(num_slices.value / 2)
     metadata.value = json.metadata;
-    image_cache.set(file_name, json)
+    image_cache.value.set(file_name, {'data': json, 'timestamp': Date.now()})
   }
-  update_cache()
+  // update_cache()
 }
 
 async function fetchBucketContent(bucket_name) {
@@ -132,17 +151,15 @@ async function fetchBucketContent(bucket_name) {
 
 async function update_cache() {
   const images_to_cache = search_images_to_cache(bucket_content.value, idx_img_curr_shown.value)
-  abort_fetch_not_needed(images_to_cache)
-  clean_cache(images_to_cache)
-
+  
   for(const file_name of images_to_cache) {
-    if( ! image_cache.has(file_name) ) {
+      if( ! image_cache.value.has(file_name) && ! images_being_fetched.has(file_name)) {
         const abort_controller = new AbortController()
-        images_being_fetched.set(file_name, abort_controller)
         const image = await fetchImage(file_name, abort_controller)
-        image_cache.set(file_name, image)
+        image_cache.value.set(file_name, {'data': image, 'timestamp': Date.now()})
+        images_being_fetched.delete(file_name)
+      }
     }
-  }
 }
 
 function clean_cache(images_to_cache) {
@@ -166,17 +183,17 @@ function abort_fetch_not_needed(images_to_cache) {
 function search_images_to_cache(bucket_content, curr_img_index) {  
   const images_to_cache = []
   for(let i=0; i<NUM_CACHE_AFTER; i++) {
-    const img_idx = curr_img_index + i
+    const img_idx = curr_img_index + i + 1
     if(img_idx < bucket_content.length) {
       images_to_cache.push(bucket_content[img_idx].file_name, null)
     }
   }
-  for(let i=0; i<NUM_CACHE_BEFORE; i++) {
-    const img_idx = curr_img_index - 1 - i
-    if(img_idx >= 0) {
-      images_to_cache.push(bucket_content[img_idx].file_name, null)
-    }
-  }
+  // for(let i=0; i<NUM_CACHE_BEFORE; i++) {
+  //   const img_idx = curr_img_index - 1 - i
+  //   if(img_idx >= 0) {
+  //     images_to_cache.push(bucket_content[img_idx].file_name, null)
+  //   }
+  // }
   return images_to_cache
 }
 
@@ -206,9 +223,8 @@ async function approve() {
 function arrow_down() {
   if (idx_img_curr_shown.value != null 
       && idx_img_curr_shown.value < bucket_content.value.length-1) { 
-        curr_active_items.value[idx_img_curr_shown.value] = false
         idx_img_curr_shown.value += 1
-        curr_active_items.value[idx_img_curr_shown.value] = true
+        set_curr_active(idx_img_curr_shown.value)
         selectImage(bucket_content.value[idx_img_curr_shown.value].file_name)
       }   
 }
@@ -216,11 +232,15 @@ function arrow_down() {
 function arrow_up() {
   if (idx_img_curr_shown.value != null 
       && idx_img_curr_shown.value > 0) {
-        curr_active_items.value[idx_img_curr_shown.value] = false
         idx_img_curr_shown.value -= 1
-        curr_active_items.value[idx_img_curr_shown.value] = true
+        set_curr_active(idx_img_curr_shown.value)
         selectImage(bucket_content.value[idx_img_curr_shown.value].file_name)
       }   
+}
+
+function set_curr_active(idx) {
+  curr_active_items.value = Array(curr_active_items.value.length).fill(false)
+  curr_active_items.value[idx] = true
 }
 
 function select_curr() {
@@ -267,7 +287,7 @@ function select_curr() {
         <!-- v-responsive needs to be here because otherwise it seems that we can't rotate the image in every aspect ratio -->
         <v-responsive>
           <v-img
-            v-if="image_slices.length > 0"
+            v-if="image_slices.length > 0 && !loading"
             :id="image_rotation"
             class="image_class"
             v-bind:src="
@@ -283,7 +303,8 @@ function select_curr() {
             align="center"
             justify="center"
           >
-            <h1 class="text-h3 font-weight-bold">No Image</h1>
+            <h1 class="text-h3 font-weight-bold" v-if="!loading">No Image</h1>
+            <v-progress-circular indeterminate v-if="loading" :size="76" :width="8"></v-progress-circular>
           </v-sheet>
         </v-responsive>
         <v-slider
@@ -312,6 +333,7 @@ function select_curr() {
               :active="curr_active_items[idx]"
               @click="
                 selectImage(item.file_name);
+                set_curr_active(idx)
                 idx_img_curr_shown = idx;
               "
             >
@@ -398,4 +420,5 @@ function select_curr() {
 .toggle_all {
   margin-top: 10px;
 }
+
 </style>
