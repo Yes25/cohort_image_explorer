@@ -260,7 +260,7 @@ function select_curr() {
   <v-container class="main_container w-100">
     <v-row align="center" justify="center">
       <v-spacer />
-      <h1 class="text-h3 font-weight-bold">Cohort Explorer</h1>
+      <h1 class="text-h3 font-weight-bold">Image Cohort Explorer</h1>
       <v-spacer />
       <LoginDialog v-model="login" />
     </v-row>
