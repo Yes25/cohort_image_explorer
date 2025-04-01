@@ -152,6 +152,8 @@ struct DicomBase64Slice {
 pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
     let mut archive = Archive::new(dicom_tar.as_slice());
 
+    // TODO: Check if files in the archive are compressed. If so decompress them...
+
     // TODO: Can I somehow get the number of files in the archive. Then create Vec::with_capacity() -> no alloc needed then
     let mut slices: Vec<DicomBase64Slice> = Vec::new();
 
