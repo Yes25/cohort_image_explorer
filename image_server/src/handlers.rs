@@ -22,7 +22,9 @@ pub async fn fetch_image(
 ) -> impl IntoResponse {
     let (username, password) = get_usr_and_pwd(headers);
     let bucket = get_bucket(&bucket_name, &username, &password);
-
+    // "/" are replaced by "!" in forntend because otherwise the correct route is not triggered. Need to be changed back here
+    // not optimal...
+    let image_name = image_name.replace("!", "/");
     let response_data = bucket.get_object(&image_name).await.unwrap();
     let image_data = response_data.to_vec();
 

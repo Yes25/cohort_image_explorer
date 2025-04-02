@@ -75,6 +75,9 @@ function remove_oldest(cache) {
 }
 
 async function fetchImage(file_name, abort_controller) {
+  // replace / with !. Otherwise keys with / in them won't get recognized by route in image server. Image Server needs to change them back
+  // TODO: Not nice solution. Better send name in body?
+  file_name = file_name.replaceAll('/', '!')
   const url = `${api_url}bucket/${bucket_name.value}/image/${file_name}`;
   try {
     const response = await fetch(url, {

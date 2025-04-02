@@ -49,11 +49,13 @@ pub async fn build_filename_list(results: Vec<ListBucketResult>, bucket: Box<s3:
     let mut bucket_contents: Vec<BucketContent> = Vec::new();
     for result in results {
         for content in result.contents {
+            
             let file_name = content.key;
             // TODO: Seems to slow down list loading significantly
             // let tag_data = bucket.get_object_tagging(&file_name).await.unwrap().0;
             // let approved = get_approval(tag_data, &username);
             let approved = String::from("false");
+            
             bucket_contents.push(
                 BucketContent{
                     key: file_name,

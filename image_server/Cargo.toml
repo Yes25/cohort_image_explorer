@@ -20,7 +20,7 @@ tracing = "0.1"
 
 rust-s3 = "0.35.1"
 base64 = "0.22.1"
-tar = "0.4.43"
+tar = "0.4.44"
 
 image = "0.25.5"
 dicom = { version = "0.8.1", features = ["image"] }

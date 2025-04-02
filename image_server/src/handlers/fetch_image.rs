@@ -152,8 +152,6 @@ struct DicomBase64Slice {
 pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
     let mut archive = Archive::new(dicom_tar.as_slice());
 
-    // TODO: Check if files in the archive are compressed. If so decompress them...
-
     // TODO: Can I somehow get the number of files in the archive. Then create Vec::with_capacity() -> no alloc needed then
     let mut slices: Vec<DicomBase64Slice> = Vec::new();
 
@@ -166,32 +164,35 @@ pub fn generate_dicom_image(dicom_tar: Vec<u8>) -> ImageData {
     for slice in archive.entries().unwrap() {
         let mut slice = slice.unwrap();
 
-        let mut image_buf: Vec<u8> = Vec::new();
-        slice.read_to_end(&mut image_buf).unwrap();
-        let (dcm_img, header_info) = decode_dicom_slice(image_buf, is_first_slice);
+        if slice.header().path().unwrap().to_str().unwrap() != "MD5SUM" {
 
-        if let Some(header_info) = header_info {
-            metadata.insert(String::from("dicom_info"), header_info);
-            is_first_slice = false;
+            let mut image_buf: Vec<u8> = Vec::new();
+            slice.read_to_end(&mut image_buf).unwrap();
+            let (dcm_img, header_info) = decode_dicom_slice(image_buf, is_first_slice);
+
+            if let Some(header_info) = header_info {
+                metadata.insert(String::from("dicom_info"), header_info);
+                is_first_slice = false;
+            }
+
+            if size_x == 0 {
+                size_x = dcm_img.width;
+                size_y = dcm_img.height;
+            }
+
+            let color = image::ExtendedColorType::L8;
+            let mut encoded_image = Vec::new();
+
+            image::codecs::png::PngEncoder::new(encoded_image.by_ref())
+                .write_image(&dcm_img.img_vec, dcm_img.width, dcm_img.height, color)
+                .expect("error encoding pixels as PNG");
+
+            let base64_png = BASE64_STANDARD.encode(encoded_image);
+            slices.push(DicomBase64Slice {
+                slice: base64_png,
+                location: dcm_img.location,
+            });
         }
-
-        if size_x == 0 {
-            size_x = dcm_img.width;
-            size_y = dcm_img.height;
-        }
-
-        let color = image::ExtendedColorType::L8;
-        let mut encoded_image = Vec::new();
-
-        image::codecs::png::PngEncoder::new(encoded_image.by_ref())
-            .write_image(&dcm_img.img_vec, dcm_img.width, dcm_img.height, color)
-            .expect("error encoding pixels as PNG");
-
-        let base64_png = BASE64_STANDARD.encode(encoded_image);
-        slices.push(DicomBase64Slice {
-            slice: base64_png,
-            location: dcm_img.location,
-        });
     }
     slices.sort_by(|a, b| {
         if let Some(a_location) = a.location {
