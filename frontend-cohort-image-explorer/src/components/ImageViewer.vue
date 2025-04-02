@@ -3,8 +3,8 @@ import { rotate_left, rotate_right } from "@/js/ImageViewer";
 import { get_auth_header, get_approved_images } from "@/js/helper_funcs";
 import { ref, useTemplateRef } from "vue";
 
-const NUM_CACHE_BEFORE = 2
-const NUM_CACHE_AFTER = 3
+// const NUM_CACHE_BEFORE = 2
+const NUM_CACHE_AFTER = 4
 const NUM_MAX_CACHED_IMG = 10
 
 const api_url = "http://localhost:3030/api/";
@@ -31,8 +31,10 @@ const idx_img_curr_shown = ref(null);
 const curr_active_items = ref(null);
 
 const image_cache = ref(new Map());
+
 let curr_img_abort_control = null
 let images_being_fetched = new Map()
+let image_awaited = null
 
 const select_all = ref("false")
 watch(
@@ -54,6 +56,11 @@ watch(
 watch(
   () => image_cache.value,
   (cache) => {
+    if(image_awaited != null && cache.has(image_awaited)) {
+      const json = cache.get(image_awaited).data
+      set_image(json)
+      image_awaited = null
+    }
     const cache_lenth = cache.size
     if (cache_lenth >= NUM_MAX_CACHED_IMG) {
       remove_oldest(cache)
@@ -97,35 +104,46 @@ async function fetchImage(file_name, abort_controller) {
 }
 
 async function selectImage(file_name) {
-  let json = null
-  
+  loading.value = true
   if (images_being_fetched.has(file_name)) {
+    image_awaited = file_name
     console.log(`${file_name} already beeing fetched`)
     return
-  } else if (curr_img_abort_control != null) {
-    curr_img_abort_control.abort()
-    images_being_fetched.delete(file_name)
-    console.log(`Fetching ${file_name} aborted`)
   }
+  // needs to be in here, ohterwise it is possible that the firs fetched image arrives after the second and beeing displayed instead
+  // TODO: might be a problem wirh aborted images ???
+  if (curr_img_abort_control != null) {
+    image_awaited = file_name
+    curr_img_abort_control.abort()
+  }
+  // Once aborted it always enters here, so the image_cache seems to have the key, but nothing is in there 
   if(image_cache.value.has(file_name)) {
-    json = image_cache.value.get(file_name).data
+    const json = image_cache.value.get(file_name).data
+    set_image(json)
   } else {
     curr_img_abort_control = new AbortController()
-    images_being_fetched.set(file_name)
-    loading.value = true
-    json = await fetchImage(file_name, curr_img_abort_control)
-    loading.value = false
+    image_awaited = file_name
+    images_being_fetched.set(file_name, curr_img_abort_control)
+    const json = await fetchImage(file_name, curr_img_abort_control)
+    set_image(json)
     curr_img_abort_control = null
     images_being_fetched.delete(file_name)
+    if(json != null) {
+      image_cache.value.set(file_name, {'data': json, 'timestamp': Date.now()})
+    }
   }
+  update_cache()
+}
+
+function set_image(json) {
   if(json != null) {
     image_slices.value = json.slices;
     num_slices.value = json.slices.length;
     curr_slice_idx.value = Math.ceil(num_slices.value / 2)
     metadata.value = json.metadata;
-    image_cache.value.set(file_name, {'data': json, 'timestamp': Date.now()})
+    loading.value = false
+    image_awaited = null
   }
-  // update_cache()
 }
 
 async function fetchBucketContent(bucket_name) {
@@ -142,7 +160,7 @@ async function fetchBucketContent(bucket_name) {
     
     bucket_content.value = []
     curr_active_items.value = []
-    for(let item of json.bucket_contents) {
+    for(const item of json.bucket_contents) {
       bucket_content.value.push({"file_name": item.key, "isSelected": item.approved})
       curr_active_items.value.push(false)
     }
@@ -154,49 +172,36 @@ async function fetchBucketContent(bucket_name) {
 
 async function update_cache() {
   const images_to_cache = search_images_to_cache(bucket_content.value, idx_img_curr_shown.value)
+
+  // only abort what is beeing fetched, not clean cache
+  for(const [file_name, abort_controller] of images_being_fetched) {
+      if(! images_to_cache.includes(file_name)) {
+        abort_controller.abort()
+        images_being_fetched.delete(file_name)
+        console.log(`abort fetching ${file_name}`)
+      }
+    }
   
   for(const file_name of images_to_cache) {
       if( ! image_cache.value.has(file_name) && ! images_being_fetched.has(file_name)) {
         const abort_controller = new AbortController()
+        images_being_fetched.set(file_name, abort_controller)
         const image = await fetchImage(file_name, abort_controller)
-        image_cache.value.set(file_name, {'data': image, 'timestamp': Date.now()})
         images_being_fetched.delete(file_name)
+        image_cache.value.set(file_name, {'data': image, 'timestamp': Date.now()})
       }
     }
 }
 
-function clean_cache(images_to_cache) {
-  for(const key of image_cache.keys()) {
-    if(! images_to_cache.includes(key)) {
-      image_cache.delete(key)
-    }
-  }
-}
-
-function abort_fetch_not_needed(images_to_cache) {
-  for(const key of images_being_fetched.keys()) {
-    if(! images_to_cache.includes(key)) {
-      images_being_fetched.get(key).abort()
-      images_being_fetched.delete(key)
-    }
-  }
-}
-
 
 function search_images_to_cache(bucket_content, curr_img_index) {  
-  const images_to_cache = []
+  let images_to_cache = []
   for(let i=0; i<NUM_CACHE_AFTER; i++) {
     const img_idx = curr_img_index + i + 1
     if(img_idx < bucket_content.length) {
-      images_to_cache.push(bucket_content[img_idx].file_name, null)
+      images_to_cache.push(bucket_content[img_idx].file_name)
     }
   }
-  // for(let i=0; i<NUM_CACHE_BEFORE; i++) {
-  //   const img_idx = curr_img_index - 1 - i
-  //   if(img_idx >= 0) {
-  //     images_to_cache.push(bucket_content[img_idx].file_name, null)
-  //   }
-  // }
   return images_to_cache
 }
 
