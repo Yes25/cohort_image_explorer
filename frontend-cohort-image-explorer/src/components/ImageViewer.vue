@@ -186,9 +186,11 @@ async function update_cache() {
       if( ! image_cache.value.has(file_name) && ! images_being_fetched.has(file_name)) {
         const abort_controller = new AbortController()
         images_being_fetched.set(file_name, abort_controller)
-        const image = await fetchImage(file_name, abort_controller)
+        const json = await fetchImage(file_name, abort_controller)
         images_being_fetched.delete(file_name)
-        image_cache.value.set(file_name, {'data': image, 'timestamp': Date.now()})
+        if(json != null) {
+          image_cache.value.set(file_name, {'data': json, 'timestamp': Date.now()})
+        }
       }
     }
 }
