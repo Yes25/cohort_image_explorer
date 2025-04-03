@@ -2,10 +2,10 @@
 import { rotate_left, rotate_right } from "@/js/ImageViewer";
 import { get_auth_header, get_approved_images } from "@/js/helper_funcs";
 import { ref, useTemplateRef } from "vue";
+import Settings from "./Settings.vue";
 
-// const NUM_CACHE_BEFORE = 2
-const NUM_CACHE_AFTER = 4
-const NUM_MAX_CACHED_IMG = 10
+let  NUM_TO_PREFETCH = 7
+const NUM_MAX_CACHED_IMG = NUM_TO_PREFETCH + 3
 
 const api_url = "http://localhost:3030/api/";
 
@@ -15,9 +15,15 @@ const login = ref({
   all_buckets: [],
 });
 
+let settings = ref({
+  num_to_prefetch: 7,
+  num_max_cached_imgs:  10
+})
+
 const itemRefs = useTemplateRef('items')
 
 const loading = ref(false)
+const alert = ref(false)
 
 const image_slices = ref([]);
 const curr_slice_idx = ref(0);
@@ -62,7 +68,7 @@ watch(
       image_awaited = null
     }
     const cache_lenth = cache.size
-    if (cache_lenth >= NUM_MAX_CACHED_IMG) {
+    if (cache_lenth >= settings.value.num_max_cached_imgs) {
       remove_oldest(cache)
     }
   },{ deep: true}
@@ -198,7 +204,7 @@ async function update_cache() {
 
 function search_images_to_cache(bucket_content, curr_img_index) {  
   let images_to_cache = []
-  for(let i=0; i<NUM_CACHE_AFTER; i++) {
+  for(let i=0; i<settings.value.num_to_prefetch; i++) {
     const img_idx = curr_img_index + i + 1
     if(img_idx < bucket_content.length) {
       images_to_cache.push(bucket_content[img_idx].file_name)
@@ -264,6 +270,16 @@ function select_curr() {
         }
       }
 }
+
+function update_settings(num_to_prefetch, max_cached_imgs) {
+  if(num_to_prefetch <= max_cached_imgs) {
+    settings.value.num_to_prefetch = num_to_prefetch
+    settings.value.num_max_cached_imgs = max_cached_imgs
+  } else {
+    alert.value = true
+  }
+}
+
 </script>
 
 <template>
@@ -272,6 +288,7 @@ function select_curr() {
       <v-spacer />
       <h1 class="text-h3 font-weight-bold">Image Cohort Explorer</h1>
       <v-spacer />
+      <Settings :settings="settings" @updateSettings="update_settings"/>
       <LoginDialog v-model="login" />
     </v-row>
     <v-row>
@@ -368,6 +385,14 @@ function select_curr() {
       </v-col>
     </v-row>
   </v-container>
+  <v-alert
+    v-model="alert"
+    color="error"
+    icon="$error"
+    title="Error"
+    text="The Number maximal Number of cached images needs to be bigger or equal than the number of images to prefetch."
+    closable
+  ></v-alert>
 </template>
 
 <style scoped>
