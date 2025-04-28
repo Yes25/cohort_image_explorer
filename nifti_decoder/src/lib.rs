@@ -1,14 +1,70 @@
 use flate2::read::GzDecoder;
+use num_traits::{Bounded, FromBytes};
+use std::fmt::Debug;
 use std::io::prelude::*;
+use std::mem;
+
+pub trait FromLeBytes: Sized {
+    fn from_le_bytes(bytes: &[u8]) -> Option<Self>;
+}
+
+// Implement it for common numeric types:
+macro_rules! impl_from_le_bytes {
+    ($t:ty) => {
+        impl FromLeBytes for $t {
+            fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+                let size = mem::size_of::<$t>();
+                if bytes.len() < size {
+                    return None;
+                }
+                let array: [u8; mem::size_of::<$t>()] = bytes[..size].try_into().ok()?;
+                Some(<$t>::from_le_bytes(array))
+            }
+        }
+    };
+}
+
+impl_from_le_bytes!(u8);
+impl_from_le_bytes!(i8);
+impl_from_le_bytes!(u16);
+impl_from_le_bytes!(i16);
+impl_from_le_bytes!(u32);
+impl_from_le_bytes!(i32);
+impl_from_le_bytes!(u64);
+impl_from_le_bytes!(i64);
+impl_from_le_bytes!(f32);
+impl_from_le_bytes!(f64);
+
 
 pub fn decode_nifti(nifit_data: Vec<u8>) -> (Header, Vec<u8>) {
     let unpacked = assure_unpacked(nifit_data);
     let header = Header::from_bytes(&unpacked);
 
     assert_eq!(header.sizeof_hdr, 348);
-    let volume = decode_volume(&unpacked, header.vox_offset, header.datatype, header.bitpix);
 
-    (header, volume)
+    match get_volume(&unpacked, header.vox_offset, header.bitpix) {
+        Some(volume)  => {
+            (header, volume)
+        },
+        None => {
+            println!("WARN ::: dtype ({}) not implemented yet", header.datatype);
+            (header, vec![])
+        }
+    }
+}
+
+fn get_volume(nifit_data:&Vec<u8>, vox_offset:u32, bitpix:u16) -> Option<Vec<u8>> {
+    if bitpix == 8 {
+        Some(decode_volume::<u8>(nifit_data, vox_offset, bitpix))
+    } else if bitpix == 16 {
+       Some(decode_volume::<u16>(nifit_data, vox_offset, bitpix))
+    } else if bitpix == 32 {
+        Some(decode_volume::<u32>(nifit_data, vox_offset, bitpix))
+    } else if bitpix == 64 {
+        Some(decode_volume::<f64>(nifit_data, vox_offset, bitpix))
+    } else {
+        None
+    }
 }
 
 fn assure_unpacked(bytes: Vec<u8>) -> Vec<u8> {
@@ -80,45 +136,67 @@ fn create_dim_arr(nifit_bytes: &Vec<u8>) -> Vec<u16> {
     dimensions
 }
 
-fn decode_volume(nifit_data: &Vec<u8>, vox_offset: u32, _datatype: u16, bitpix: u16) -> Vec<u8> {
-    assert_eq!(
-        bitpix, 16,
-        "bitpix is not 16 -> other formats are not implemented, jet."
-    );
+fn decode_volume<T>(nifit_data: &Vec<u8>, vox_offset: u32, bitpix: u16) -> Vec<u8> 
+    where T: FromLeBytes + Into<f64> + Bounded + FromBytes + PartialOrd + Copy + Debug
+{
 
     let vox_offset = vox_offset as usize;
-    let (min, max) = get_min_max_u16(&nifit_data[vox_offset..]);
+    let (min, max) = get_min_max(&nifit_data[vox_offset..]);
     let size_volume_bytes = nifit_data.len() - vox_offset;
     let size_pix_bytes = (bitpix / 8) as usize;
     let mut img_vec: Vec<u8> = Vec::with_capacity(size_volume_bytes / size_pix_bytes);
 
     for i in (0..nifit_data.len() - vox_offset).step_by(size_pix_bytes) {
-        // pixel vals are i16 -> 2 bytes -> conat two bytes to get value
-        let i16_bytes = [nifit_data[i + vox_offset], nifit_data[i + vox_offset + 1]];
+        let start = i + vox_offset;
+        let end = i + vox_offset + size_pix_bytes;
+        let byte_slice = &nifit_data[start..end];
         // here little endian, could also be big? (is stored in volume struct)
-        let pixel_val = scale_pix_val(min, max, u16::from_le_bytes(i16_bytes));
+        let orig_pix_val = <T as FromLeBytes>::from_le_bytes(byte_slice);
+        
+        let pixel_val = match orig_pix_val {
+            Some(orig_pix_val) => scale_pix_val(min, max, orig_pix_val),
+            None => 0
+        };
+        
         img_vec.push(pixel_val);
     }
     img_vec
 }
 
-fn get_min_max_u16(data: &[u8]) -> (u16, u16) {
-    let mut max: u16 = u16::MIN;
-    let mut min: u16 = u16::MAX;
-    for i in (0..data.len()).step_by(2) {
-        let val = u16::from_le_bytes([data[i], data[i + 1]]);
-        if val > max {
-            max = val;
-        }
-        if val < min {
-            min = val;
+
+fn get_min_max<T>(data: &[u8]) -> (T, T) 
+where 
+    T: Bounded + FromBytes + PartialOrd + FromLeBytes + Copy + Debug
+{
+    let mut max: T = T::min_value();
+    let mut min: T = T::max_value();
+    let num_bytes = mem::size_of::<T>();
+    for i in (0..data.len()).step_by(num_bytes) {
+        let byte_slice = &data[i..(i + num_bytes)];
+        let opt_val = <T as FromLeBytes>::from_le_bytes(byte_slice);
+        // println!("opt_val: '{:?}'", opt_val);
+        if let Some(val) = opt_val {
+            if val > max {
+                max = val;
+            }
+            if val < min {
+                min = val;
+            }
         }
     }
     (min, max)
 }
 
-fn scale_pix_val(min: u16, max: u16, pix_val: u16) -> u8 {
-    (((pix_val - min) as f32 / max as f32) * 255.) as u8
+fn scale_pix_val<T>(min: T, max: T, pix_val: T) -> u8 
+where 
+    T: Into<f64> + Debug
+{
+    let sub = pix_val.into() - min.into();
+    // needs to be a float vulue here. Otherwise it gets rounded to 0.
+    let div = sub / max.into();
+    let scale = div * 255.;
+
+    scale as u8
 }
 
 #[cfg(test)]

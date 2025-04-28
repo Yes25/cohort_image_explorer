@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 flate2 = "1.0.35"
 image = "0.25.5"
+num-traits = "0.2.19"
