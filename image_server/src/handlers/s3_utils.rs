@@ -7,8 +7,8 @@ use s3::serde_types::ListBucketResult;
 use s3::Tag;
 use serde::Serialize;
 
-// static S3_URL: &str = "http://127.0.0.1:9000";
-static S3_URL: &str = "http://s3.lake-test.medicsh.de:9000";
+static S3_URL: &str = "http://127.0.0.1:9000";
+// static S3_URL: &str = "http://s3.lake-test.medicsh.de:9000";
 
 pub fn get_s3_region_and_creds(access_key: &str, secret_key: &str) -> (Region, Credentials) {
     (
@@ -45,23 +45,24 @@ pub struct BucketContent {
     pub approved: String,
 }
 
-pub async fn build_filename_list(results: Vec<ListBucketResult>, bucket: Box<s3::Bucket>, username: String) -> Vec<BucketContent> {
+pub async fn build_filename_list(
+    results: Vec<ListBucketResult>,
+    bucket: Box<s3::Bucket>,
+    username: String,
+) -> Vec<BucketContent> {
     let mut bucket_contents: Vec<BucketContent> = Vec::new();
     for result in results {
         for content in result.contents {
-            
             let file_name = content.key;
             // TODO: Seems to slow down list loading significantly
             // let tag_data = bucket.get_object_tagging(&file_name).await.unwrap().0;
             // let approved = get_approval(tag_data, &username);
             let approved = String::from("false");
-            
-            bucket_contents.push(
-                BucketContent{
-                    key: file_name,
-                    approved
-                }
-            );
+
+            bucket_contents.push(BucketContent {
+                key: file_name,
+                approved,
+            });
         }
     }
     bucket_contents
@@ -70,7 +71,7 @@ pub async fn build_filename_list(results: Vec<ListBucketResult>, bucket: Box<s3:
 fn get_approval(tag_data: Vec<Tag>, username: &String) -> String {
     for tag in tag_data {
         if tag.key() == format!("{username}_approved") && tag.value() == "true" {
-            return String::from("true")
+            return String::from("true");
         }
     }
     String::from("false")

@@ -1,6 +1,6 @@
 use axum::{
     routing::{get, post},
-    Router
+    Router,
 };
 use tower::ServiceBuilder;
 // use tower_http::compression::CompressionLayer;
@@ -21,7 +21,9 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let path = "/Users/jesse/Code/rust_proj/cohort_image_explorer/frontend-cohort-image-explorer/dist";
+    let path =
+        "/Users/jesse/Code/rust_proj/cohort_image_explorer/frontend-cohort-image-explorer/dist";
+    //     let path = "/app/dist";
 
     let app = Router::new()
         .fallback_service(ServeDir::new(path))
@@ -36,7 +38,7 @@ async fn main() {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(CorsLayer::very_permissive()),
-                // .layer(CompressionLayer::new()),
+            // .layer(CompressionLayer::new()),
         );
 
     let listener = tokio::net::TcpListener::bind("localhost:3030")
