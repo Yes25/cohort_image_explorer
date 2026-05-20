@@ -6,15 +6,14 @@ use s3::region::Region;
 use s3::serde_types::ListBucketResult;
 use s3::Tag;
 use serde::Serialize;
-
-static S3_URL: &str = "http://127.0.0.1:9000";
-// static S3_URL: &str = "http://s3.lake-test.medicsh.de:9000";
+use std::env;
 
 pub fn get_s3_region_and_creds(access_key: &str, secret_key: &str) -> (Region, Credentials) {
+    let s3_url = env::var("S3_URL").expect("S3_URL must be set");
     (
         Region::Custom {
             region: "".to_owned(),
-            endpoint: S3_URL.to_owned(),
+            endpoint: s3_url,
         },
         Credentials {
             access_key: Some(access_key.to_owned()),

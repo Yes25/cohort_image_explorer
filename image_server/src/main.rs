@@ -4,6 +4,8 @@ use axum::{
 };
 use tower::ServiceBuilder;
 // use tower_http::compression::CompressionLayer;
+use dotenvy::dotenv;
+use std::env;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Level;
@@ -21,12 +23,15 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let path =
+    dotenv().ok();
+
+    let frontend_path =
         "/Users/jesse/Code/rust_proj/cohort_image_explorer/frontend-cohort-image-explorer/dist";
+    // if deployment is done within a container
     //     let path = "/app/dist";
 
     let app = Router::new()
-        .fallback_service(ServeDir::new(path))
+        .fallback_service(ServeDir::new(frontend_path))
         .route(
             "/api/bucket/{bucket_name}/image/{image_name}",
             get(fetch_image),
@@ -41,8 +46,8 @@ async fn main() {
             // .layer(CompressionLayer::new()),
         );
 
-    let listener = tokio::net::TcpListener::bind("localhost:3030")
-        .await
-        .unwrap();
+    let frontend_port = env::var("FRONTEND_PORT").unwrap_or("8080".to_string());
+    let frontend_addr = format!("localhost:{}", frontend_port);
+    let listener = tokio::net::TcpListener::bind(frontend_addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
